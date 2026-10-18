@@ -1,3 +1,4 @@
+import type { LinkLimit, ObjectResourceRole } from '../domain/balance'
 import type { CityDraft } from '../domain/layout'
 import type { CatalogSnapshot, City, DevelopmentStatus, ReliabilityStatus } from '../domain/types'
 import { collectStoredLayoutIssues, type StoredLayouts } from '../domain/user-city'
@@ -74,7 +75,47 @@ function isDraft(value: unknown): value is CityDraft {
     return false
   }
   const draft = value as CityDraft
-  return typeof draft.cityId === 'string' && Array.isArray(draft.objects) && Array.isArray(draft.systems) && Array.isArray(draft.flows) && Array.isArray(draft.roads)
+  const lists = draft.resourceRoles === undefined || (Array.isArray(draft.resourceRoles) && draft.resourceRoles.every(isResourceRole))
+  const limits = draft.linkLimits === undefined || (Array.isArray(draft.linkLimits) && draft.linkLimits.every(isLinkLimit))
+  return typeof draft.cityId === 'string'
+    && Array.isArray(draft.objects)
+    && Array.isArray(draft.systems)
+    && Array.isArray(draft.flows)
+    && Array.isArray(draft.roads)
+    && lists
+    && limits
+}
+
+function isResourceRole(value: unknown): value is ObjectResourceRole {
+  if (!value || typeof value !== 'object') {
+    return false
+  }
+  const role = value as ObjectResourceRole
+  return typeof role.objectId === 'string'
+    && typeof role.resourceTypeId === 'string'
+    && isNonNegative(role.produces)
+    && isNonNegative(role.consumes)
+    && isNonNegative(role.stores)
+    && isNonNegative(role.stock)
+    && Number.isFinite(role.priority)
+}
+
+function isLinkLimit(value: unknown): value is LinkLimit {
+  if (!value || typeof value !== 'object') {
+    return false
+  }
+  const limit = value as LinkLimit
+  return typeof limit.flowId === 'string'
+    && isNonNegative(limit.capacity)
+    && typeof limit.loss === 'number'
+    && Number.isFinite(limit.loss)
+    && limit.loss >= 0
+    && limit.loss <= 1
+    && typeof limit.inService === 'boolean'
+}
+
+function isNonNegative(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0
 }
 
 function isCity(value: unknown): value is City {

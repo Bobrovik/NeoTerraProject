@@ -36,6 +36,10 @@ Interface strings are English. Shared status labels are in `src/shared/labels.ts
 
 Selection changes the nested object route and the highlight. It does not remount the city canvas. The system diagram is SVG, so it can be tested and drawn without WebGL.
 
+## 2026-10-18 — Map base is a separate view
+
+The city editor stays in local meters. A Map mode loads MapLibre GL and the OpenFreeMap Liberty style (`https://tiles.openfreemap.org/styles/liberty`). That public style needs no API key. `VITE_MAP_STYLE_URL` can replace it. The MapLibre worker is served by this app as `maplibre-gl-worker.cjs` so Vite does not wrap it. Clicks become east/north meters through `geodeticToLocal`, then the existing `placeObject` path. The screen scale is Web Mercator and is only a label. The official OpenStreetMap tile server is not used. If the style fails to load, the other city modes still open.
+
 ## 2026-10-18 — Layout edits sit on top of the catalog
 
 Overview, layout, and systems are view modes of the same city scene. Layout changes positions, rotations, roads, and links through pure functions in `src/domain/layout.ts`, then stores a city draft in the browser. The scene only draws the draft. A link stores a source, a recipient, and a resource type. It does not calculate distribution. Roads stay a separate list from `ResourceFlow`.

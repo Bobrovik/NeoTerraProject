@@ -1,9 +1,12 @@
 import { OrbitControls } from '@react-three/drei'
 import { Canvas, useThree } from '@react-three/fiber'
 import { useEffect, useMemo, useRef } from 'react'
+import type { EnergyLineDraw, SupplyTone } from '../domain/energy-view'
 import { resolveFlowSegments } from '../domain/flows'
-import type { CameraView, CityObject, CityViewMode, LayoutTool, ResourceFlow, ResourceType, Road } from '../domain/types'
+import type { CameraView, CityObject, CityViewMode, LayoutTool, ResourceFlow, ResourceType, Road, Vec3 } from '../domain/types'
 import { CityObjectMesh } from './CityObjectMesh'
+import { EnergyCard } from './EnergyCard'
+import { EnergyGrid } from './EnergyGrid'
 import { FlowLines } from './FlowLines'
 import { RoadLines } from './RoadLines'
 import { StarField } from './StarField'
@@ -26,6 +29,10 @@ export function CityScene({
   onMoveObject,
   onSelectRoadPoint,
   onMoveRoadPoint,
+  energyView = false,
+  energyLines = [],
+  energyTones,
+  selectionCard = null,
 }: {
   objects: CityObject[]
   flows: ResourceFlow[]
@@ -44,11 +51,15 @@ export function CityScene({
   onMoveObject: (objectId: string, x: number, z: number) => void
   onSelectRoadPoint: (roadId: string, index: number) => void
   onMoveRoadPoint: (roadId: string, index: number, x: number, z: number) => void
+  energyView?: boolean
+  energyLines?: EnergyLineDraw[]
+  energyTones?: ReadonlyMap<string, SupplyTone>
+  selectionCard?: { position: Vec3; title: string; lines: string[] } | null
 }) {
-  const segments = useMemo(
-    () => resolveFlowSegments(flows, objects, resourceTypes, new Set(objects.map((object) => object.id))),
-    [flows, objects, resourceTypes],
-  )
+  const segments = useMemo(() => {
+    const resolved = resolveFlowSegments(flows, objects, resourceTypes, new Set(objects.map((object) => object.id)))
+    return energyView ? resolved.filter((segment) => segment.resourceTypeId !== 'resource:electricity') : resolved
+  }, [flows, objects, resourceTypes, energyView])
   const drag = useRef<
     | { kind: 'object'; id: string }
     | { kind: 'point'; roadId: string; index: number }
@@ -101,6 +112,7 @@ export function CityScene({
               key={object.id}
               object={object}
               selected={object.id === selectedId}
+              energyTone={energyView ? energyTones?.get(object.id) : undefined}
               onSelect={onSelect}
               onPointerDown={
                 mode === 'layout' && tool === 'select'
@@ -126,6 +138,8 @@ export function CityScene({
         />
       ) : null}
       <FlowLines segments={segments} />
+      {energyView ? <EnergyGrid lines={energyLines} /> : null}
+      {selectionCard ? <EnergyCard position={selectionCard.position} title={selectionCard.title} lines={selectionCard.lines} /> : null}
       <OrbitControls makeDefault maxPolarAngle={camera === 'top' ? 0.35 : Math.PI / 2.05} minPolarAngle={camera === 'top' ? 0 : 0} target={[0, 0, 0]} />
     </Canvas>
   )

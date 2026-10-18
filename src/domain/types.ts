@@ -47,11 +47,22 @@ export type ObjectCategory = {
 
 export type PrimitiveShape = 'box' | 'cylinder'
 
-export type ObjectRepresentation = {
+export type PrimitiveRepresentation = {
   kind: 'primitive'
   shape: PrimitiveShape
   color: string
 }
+
+export type ModelRepresentation = {
+  kind: 'model'
+  url: string
+  fallback: {
+    shape: PrimitiveShape
+    color: string
+  }
+}
+
+export type ObjectRepresentation = PrimitiveRepresentation | ModelRepresentation
 
 export type Metric = {
   label: string
@@ -169,7 +180,7 @@ export type CatalogSource = {
   load(): Promise<CatalogSnapshot>
 }
 
-export type CityViewMode = 'overview' | 'layout' | 'systems'
+export type CityViewMode = 'overview' | 'layout' | 'systems' | 'map'
 export type CameraView = 'perspective' | 'top'
 export type LayoutTool = 'select' | 'place' | 'road'
 

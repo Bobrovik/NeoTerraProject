@@ -75,6 +75,7 @@ export function CatalogProvider({ source, children }: { source: CatalogSource; c
       tasks: [...base.tasks, ...sessionTasks],
       layoutSaved: drafts.length > 0 || userCities.length > 0,
       userCityIds: userCities.map((city) => city.id),
+      drafts,
       ...(layoutNote ? { layoutNote } : {}),
       addTask: (input) => {
         const draft = createProjectTask(input, snapshot, `task:session:${crypto.randomUUID()}`, new Date().toISOString())

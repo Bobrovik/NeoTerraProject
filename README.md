@@ -46,7 +46,7 @@ Add a `CityObject` whose `cityId` points at an existing city. Set `placement` in
 
 ## Edit a city
 
-Open a city and switch to Layout or Systems. Layout places buildings on a 4 m grid, moves and rotates them, and draws roads by clicking points or objects. Systems creates or deletes resource links. Those links are records only. The app does not calculate how much of a resource is delivered. Download JSON saves the same draft that is kept in this browser. Reset city drops that draft and shows the demo again.
+Open a city and switch to Layout, Systems, or Map. Layout places buildings on a 4 m grid, moves and rotates them, and draws roads by clicking points or objects. Systems creates or deletes resource links. Those links are records only. The app does not calculate how much of a resource is delivered. Map shows the same objects on an OpenFreeMap basemap and places a new one from a clicked latitude and longitude into the local meter frame. Download JSON saves the same draft that is kept in this browser. Reset city drops that draft and shows the demo again. Setup and attribution are in `docs/ru/города.md`.
 
 ## Add a resource system
 

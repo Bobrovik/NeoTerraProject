@@ -7,5 +7,8 @@ export function parseCityView(value: string | null): CityViewMode {
   if (value === 'systems' || value === 'flows') {
     return 'systems'
   }
+  if (value === 'map') {
+    return 'map'
+  }
   return 'overview'
 }

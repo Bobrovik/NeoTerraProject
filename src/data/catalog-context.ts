@@ -10,6 +10,7 @@ export type ReadyCatalog = {
   layoutSaved: boolean
   layoutNote?: string
   userCityIds: string[]
+  drafts: CityDraft[]
   addTask: (input: NewTaskInput) => string | undefined
   createCity: (input: UserCityInput) => string | undefined
   removeUserCity: (cityId: string) => void

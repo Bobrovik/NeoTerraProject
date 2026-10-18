@@ -28,7 +28,9 @@ export function DocumentPage() {
         {document.reliability.note ? <p className={controls.muted}>{document.reliability.note}</p> : null}
         {document.reliability.source ? <p className={controls.muted}>Source: {document.reliability.source}</p> : null}
       </header>
-      <p className={styles.body}>{document.body}</p>
+      {document.body.split(/\n\n+/).map((paragraph) => (
+        <p key={paragraph.slice(0, 48)} className={styles.body}>{paragraph}</p>
+      ))}
       <section className={styles.links}>
         <h2>Linked records</h2>
         {document.links.length === 0 ? <p className={controls.muted}>This note is not tied to one record.</p> : null}

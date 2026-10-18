@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router'
 import { useReadyCatalog } from '../../data/useCatalog'
+import { LOCAL_FRAME_RADIUS_METERS, localHorizontalDistance, localToGeodetic } from '../../domain/geo'
 import { createConnection, deleteConnection, updateObjectDetails } from '../../domain/layout'
+import { EnergyRatesForm } from './EnergyRatesForm'
 import {
   documentsForEntity,
   flowsForObject,
@@ -20,7 +22,7 @@ import controls from '../../shared/ui/controls.module.css'
 import styles from './Inspector.module.css'
 
 export function ObjectInspector() {
-  const { snapshot, tasks, editCity } = useReadyCatalog()
+  const { snapshot, tasks, drafts, editCity } = useReadyCatalog()
   const { cityId, objectId } = useParams()
   const [searchParams] = useSearchParams()
   const [targetId, setTargetId] = useState('')
@@ -58,7 +60,17 @@ export function ObjectInspector() {
       {hidden ? <p className={styles.hidden}>This object is hidden by the current category filter.</p> : null}
       <p>{object.description}</p>
       <p className={controls.muted}>{object.id}</p>
+      <LocalPosition cityLatitude={city.latitude} cityLongitude={city.longitude} x={object.placement.position.x} y={object.placement.position.y} z={object.placement.position.z} />
       <PropertyForm object={object} cityId={city.id} editCity={editCity} />
+      <EnergyRatesForm
+        cityId={city.id}
+        objectId={object.id}
+        facilityType={object.facilityType}
+        flows={flows.filter((flow) => flow.resourceTypeId === 'resource:electricity')}
+        role={drafts.find((draft) => draft.cityId === city.id)?.resourceRoles?.find((role) => role.objectId === object.id && role.resourceTypeId === 'resource:electricity')}
+        limits={drafts.find((draft) => draft.cityId === city.id)?.linkLimits}
+        editCity={editCity}
+      />
       {object.reliability.note ? <p className={controls.muted}>{object.reliability.note}</p> : null}
       {object.metrics.length > 0 ? (
         <section className={styles.block}>
@@ -182,6 +194,26 @@ export function ObjectInspector() {
         </ul>
       </section>
     </div>
+  )
+}
+
+function LocalPosition({ cityLatitude, cityLongitude, x, y, z }: { cityLatitude: number; cityLongitude: number; x: number; y: number; z: number }) {
+  const geographic = localToGeodetic({ latitude: cityLatitude, longitude: cityLongitude }, { east: x, north: z })
+  const fromOrigin = localHorizontalDistance({ x: 0, z: 0 }, { x, z })
+  return (
+    <>
+      <p className={controls.muted}>
+        Local position: {x.toFixed(1)} m east, {z.toFixed(1)} m north, {y.toFixed(1)} m up. Distances are the stored meters, not a camera scale.
+      </p>
+      {geographic ? (
+        <p className={controls.muted}>
+          WGS84 from the city origin: {geographic.latitude.toFixed(5)}°, {geographic.longitude.toFixed(5)}°.
+          {fromOrigin > LOCAL_FRAME_RADIUS_METERS ? ' This point is farther than 20 km from the origin, outside the local approximation.' : ''}
+        </p>
+      ) : (
+        <p className={controls.muted}>The local meter frame is not defined this close to a pole.</p>
+      )}
+    </>
   )
 }
 

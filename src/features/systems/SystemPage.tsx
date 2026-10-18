@@ -2,6 +2,7 @@ import { Link, useNavigate, useParams } from 'react-router'
 import { useReadyCatalog } from '../../data/useCatalog'
 import { documentsForEntity, getCity, getSystem, tasksForSystem } from '../../domain/queries'
 import { buildSystemGraph, systemGraphNodeSize } from '../../domain/system-graph'
+import { EnergyBalancePanel } from './EnergyBalancePanel'
 import { ReliabilityBadge } from '../../shared/ui/ReliabilityBadge'
 import { EmptyState } from '../../shared/ui/Status'
 import controls from '../../shared/ui/controls.module.css'
@@ -32,9 +33,10 @@ export function SystemPage() {
           <h1>{system.name}</h1>
           <ReliabilityBadge reliability={system.reliability} />
         </div>
-        <p>Kind: {system.kind}. This is a diagram of catalog links, not a calculated balance.</p>
+        <p>Kind: {system.kind}. The diagram shows saved links.</p>
         <p>{system.description}</p>
       </header>
+      {system.kind === 'energy' ? <EnergyBalancePanel cityId={city.id} /> : null}
       {graph && graph.nodes.length > 0 ? (
         <div className={styles.canvasWrap}>
           <svg width={graph.width} height={graph.height} role="img" aria-label={`${system.name} diagram`}>

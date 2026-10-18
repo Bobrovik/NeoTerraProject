@@ -1,7 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, Outlet, useNavigate, useParams, useSearchParams } from 'react-router'
 import { CityScene } from '../../3d/CityScene'
 import { SceneBoundary } from '../../3d/SceneBoundary'
+import type { MapPick } from '../../domain/map-placement'
+
+const CityMap = lazy(() => import('./CityMap').then((module) => ({ default: module.CityMap })))
 import { useReadyCatalog } from '../../data/useCatalog'
 import { buildingTemplates } from '../../domain/buildings'
 import {
@@ -15,17 +18,20 @@ import {
   snapToGrid,
   upsertRoad,
 } from '../../domain/layout'
+import type { CityElectricityReport } from '../../domain/balance'
+import { electricityLineDraws, electricitySelection, electricityTones, reportDraftElectricity } from '../../domain/energy-view'
 import { categoriesForCity, flowsForSystem, getCity, objectsForCity, systemsForCity } from '../../domain/queries'
 import type { CameraView, LayoutTool, RoadPoint } from '../../domain/types'
-import { EmptyState } from '../../shared/ui/Status'
+import { EmptyState, LoadingState } from '../../shared/ui/Status'
 import controls from '../../shared/ui/controls.module.css'
+import { EnergyBalancePanel } from '../systems/EnergyBalancePanel'
 import { InfrastructureLayers } from './InfrastructureLayers'
 import { parseCityView } from './city-view'
 import { defaultInfrastructureLayers, flowsForLayers, linkLayerEntries, type InfrastructureLayersState } from './layers'
 import styles from './CityLayout.module.css'
 
 export function CityLayout() {
-  const { snapshot, editCity, layoutSaved, layoutNote, resetCityLayout, exportLayouts, replaceLayouts } = useReadyCatalog()
+  const { snapshot, drafts, editCity, layoutSaved, layoutNote, resetCityLayout, exportLayouts, replaceLayouts } = useReadyCatalog()
   const { cityId, objectId } = useParams()
   const [searchParams, setSearchParams] = useSearchParams()
   const navigate = useNavigate()
@@ -42,6 +48,9 @@ export function CityLayout() {
   const [selectedRoadId, setSelectedRoadId] = useState<string | null>(null)
   const [selectedPointIndex, setSelectedPointIndex] = useState<number | null>(null)
   const [layers, setLayers] = useState<InfrastructureLayersState>(defaultInfrastructureLayers)
+  const [mapPick, setMapPick] = useState<MapPick | null>(null)
+  const [mapMessage, setMapMessage] = useState<string | undefined>()
+  const [energyView, setEnergyView] = useState(false)
 
   const objects = useMemo(() => (city ? objectsForCity(snapshot, city.id) : []), [snapshot, city])
   const categories = city ? categoriesForCity(snapshot, city.id) : []
@@ -71,12 +80,42 @@ export function CityLayout() {
     () => flowsForLayers(flows, snapshot.resourceTypes, layers),
     [flows, snapshot.resourceTypes, layers],
   )
+  const cityDraft = drafts.find((draft) => draft.cityId === city?.id)
+  const electricityReport = useMemo(
+    () => (city ? reportDraftElectricity(objects, flows, cityDraft) : undefined),
+    [city, objects, flows, cityDraft],
+  )
+  const energyLines = useMemo(
+    () => (energyView && electricityReport ? electricityLineDraws(flows, visibleObjects, electricityReport) : []),
+    [energyView, electricityReport, flows, visibleObjects],
+  )
+  const energyTones = useMemo(
+    () => (energyView && electricityReport ? electricityTones(electricityReport) : undefined),
+    [energyView, electricityReport],
+  )
+  const selectedObject = objectId ? objects.find((object) => object.id === objectId) : undefined
+  const selectionCard = selectedObject && electricityReport && visibleObjects.some((object) => object.id === selectedObject.id)
+    ? {
+        position: {
+          x: selectedObject.placement.position.x,
+          y: selectedObject.placement.position.y + selectedObject.placement.size.y / 2 + 1.4,
+          z: selectedObject.placement.position.z,
+        },
+        ...electricitySelection(selectedObject, electricityReport),
+      }
+    : null
+  const energyMeter = mode !== 'map' && energyView && electricityReport ? electricityReport : undefined
 
   useEffect(() => {
     return () => {
       document.body.style.cursor = ''
     }
   }, [])
+
+  useEffect(() => {
+    setMapPick(null)
+    setMapMessage(undefined)
+  }, [city?.id])
 
   if (!city) {
     return <EmptyState title="City not found" detail="That identifier is not in the catalog." action={<Link to="/planet">Back to the planet</Link>} />
@@ -151,8 +190,36 @@ export function CityLayout() {
             <button type="button" className={controls.toggle} aria-pressed={mode === 'overview'} onClick={() => setParam('view', null)}>Overview</button>
             <button type="button" className={controls.toggle} aria-pressed={mode === 'layout'} onClick={() => setParam('view', 'layout')}>Layout</button>
             <button type="button" className={controls.toggle} aria-pressed={mode === 'systems'} onClick={() => setParam('view', 'systems')}>Systems</button>
+            <button type="button" className={controls.toggle} aria-pressed={mode === 'map'} onClick={() => setParam('view', 'map')}>Map</button>
           </div>
-          {mode !== 'layout' ? (
+          {mode === 'map' ? (
+            <div className={controls.stack}>
+              <div className={controls.row} role="group" aria-label="Building catalog">
+                {buildingTemplates.map((item) => (
+                  <button key={item.id} type="button" className={controls.toggle} aria-pressed={templateId === item.id} onClick={() => setTemplateId(item.id)}>
+                    {item.name}
+                  </button>
+                ))}
+              </div>
+              <div className={controls.row}>
+                <button
+                  type="button"
+                  className={controls.ghost}
+                  disabled={!mapPick || mapPick.outsideFrame || !template}
+                  onClick={() => {
+                    if (!mapPick || mapPick.outsideFrame || !template) {
+                      return
+                    }
+                    const id = `object:${selectedCity.id.split(':')[1]}:${crypto.randomUUID()}`
+                    apply((draft) => placeObject(draft, template, mapPick.east, mapPick.north, id))
+                    selectObject(id)
+                  }}
+                >
+                  Place here
+                </button>
+              </div>
+            </div>
+          ) : mode !== 'layout' ? (
             <div className={controls.row} role="group" aria-label="Categories">
               <button type="button" className={controls.toggle} aria-pressed={!category} onClick={() => setParam('category', null)}>All</button>
               {categories.map((item) => (
@@ -214,20 +281,50 @@ export function CityLayout() {
           <p className={controls.muted}>
             {mode === 'layout'
               ? `Grid is ${GRID_METERS} m. ${tool === 'place' && template ? `Placing ${template.name}. ` : ''}Roads are physical routes and do not create resource links.`
-              : 'Simple shapes stand in for buildings.'}
+              : mode === 'map'
+                ? mapPick
+                  ? `${mapPick.latitude.toFixed(5)}°, ${mapPick.longitude.toFixed(5)}° → ${mapPick.east.toFixed(1)} m east, ${mapPick.north.toFixed(1)} m north. Stored on the ${GRID_METERS} m grid as ${snapToGrid(mapPick.east).toFixed(0)} m east, ${snapToGrid(mapPick.north).toFixed(0)} m north.`
+                  : 'Click the map to choose a point. Objects stay in local meters.'
+                : 'Simple shapes stand in for buildings.'}
             {layoutSaved ? ' Edits are saved in this browser.' : ''}
           </p>
         )}
       </div>
-      {editorMessage || layoutNote ? <p className={controls.error}>{editorMessage ?? layoutNote}</p> : null}
+      {editorMessage || layoutNote || mapMessage ? <p className={controls.error}>{editorMessage ?? mapMessage ?? layoutNote}</p> : null}
       <div className={styles.stage}>
         <div className={styles.viewport}>
-          <InfrastructureLayers
-            layers={layers}
-            entries={layerEntries}
-            onToggle={(key) => setLayers((current) => ({ ...current, [key]: !current[key] }))}
-          />
-          {visibleObjects.length === 0 && mode !== 'layout' && objects.length > 0 ? (
+          {mode === 'map' ? null : (
+            <button type="button" className={styles.energyToggle} aria-pressed={energyView} onClick={() => setEnergyView((current) => !current)}>
+              Energy view
+            </button>
+          )}
+          {energyMeter ? <EnergyMeter report={energyMeter} /> : null}
+          {mode === 'map' ? null : (
+            <InfrastructureLayers
+              layers={layers}
+              entries={layerEntries}
+              onToggle={(key) => setLayers((current) => ({ ...current, [key]: !current[key] }))}
+            />
+          )}
+          {mode === 'map' ? (
+            <Suspense fallback={<LoadingState label="Loading map…" />}>
+              <CityMap
+                city={selectedCity}
+                objects={objects}
+                roads={roads}
+                selectedId={objectId ?? null}
+                pick={mapPick}
+                onPick={(next, message) => {
+                  setMapPick(next)
+                  setMapMessage(message)
+                }}
+                onSelectObject={(nextObjectId) => {
+                  setMapMessage(undefined)
+                  selectObject(nextObjectId)
+                }}
+              />
+            </Suspense>
+          ) : visibleObjects.length === 0 && mode !== 'layout' && objects.length > 0 ? (
             <EmptyState title="Nothing in this category" detail="Choose another category to show objects again." />
           ) : (
             <SceneBoundary>
@@ -270,14 +367,63 @@ export function CityLayout() {
                   setSelectedPointIndex(index)
                 }}
                 onMoveRoadPoint={(roadId, index, x, z) => apply((draft) => moveRoadControl(draft, roadId, index, x, z))}
+                energyView={energyView}
+                energyLines={energyLines}
+                energyTones={energyTones}
+                selectionCard={selectionCard}
               />
             </SceneBoundary>
           )}
         </div>
         <aside className={styles.panel}>
+          {mode === 'systems' ? <EnergyBalancePanel cityId={selectedCity.id} /> : null}
           <Outlet />
         </aside>
       </div>
     </div>
+  )
+}
+
+function EnergyMeter({ report }: { report: CityElectricityReport }) {
+  const warning = report.status === 'ready' && report.balance.shortfall > 0
+  return (
+    <section className={warning ? `${styles.energyMeter} ${styles.energyMeterWarn}` : styles.energyMeter} aria-label="City energy balance">
+      <p className={styles.energyMeterTitle}>Energy balance</p>
+      {report.status === 'ready' ? (
+        <dl className={styles.energyRows}>
+          <div className={styles.energyRow}>
+            <dt><MeterIcon kind="production" /> Production</dt>
+            <dd>{report.balance.generated} <span className={styles.energyUnit}>kWh</span></dd>
+          </div>
+          <div className={styles.energyRow}>
+            <dt><MeterIcon kind="consumption" /> Consumption</dt>
+            <dd>{report.balance.requested} <span className={styles.energyUnit}>kWh</span></dd>
+          </div>
+          <div className={styles.energyRow}>
+            <dt><MeterIcon kind="deficit" /> Deficit</dt>
+            <dd>{report.balance.shortfall} <span className={styles.energyUnit}>kWh</span></dd>
+          </div>
+        </dl>
+      ) : (
+        <p className={styles.energyStatus}>
+          {report.status === 'not-set'
+            ? 'Parameters not set. No flow is drawn from missing rates.'
+            : `Calculation impossible. ${report.message}`}
+        </p>
+      )}
+    </section>
+  )
+}
+
+function MeterIcon({ kind }: { kind: 'production' | 'consumption' | 'deficit' }) {
+  const path = kind === 'production'
+    ? 'M6 1.5v3M6 7.5v3M1.5 6h3M7.5 6h3M2.8 2.8l1.6 1.6M7.6 7.6l1.6 1.6M9.2 2.8 7.6 4.4M4.4 7.6 2.8 9.2'
+    : kind === 'consumption'
+      ? 'M6 1.2v6.2M3.4 5.2 6 7.8l2.6-2.6M2 10.2h8'
+      : 'M6 1.4 10.6 10.2H1.4L6 1.4zM6 4.6v2.8M6 8.8v.6'
+  return (
+    <svg className={styles.energyIcon} viewBox="0 0 12 12" aria-hidden="true">
+      <path d={path} fill="none" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
   )
 }

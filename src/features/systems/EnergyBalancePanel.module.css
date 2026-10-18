@@ -1,0 +1,15 @@
+.board { display: flex; flex-direction: column; gap: 6px; }
+
+.node, .line {
+  margin: 0;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  line-height: 1.4;
+}
+
+.supplied { border-color: #6ea884; }
+
+.deficit { border-color: #d08a6a; }
+
+.limited { border-color: #d0b36a; }

@@ -31,7 +31,9 @@ Edits are not written into the demo file. They are a per-city draft in `localSto
 
 Globe coordinates are latitude and longitude in degrees. `latLonToVector3` maps them onto a sphere with Y up.
 
-City coordinates are meters in a local space, also Y up. `placement.position` is the center of the mesh. A box uses `size` as width, height, and depth. A cylinder uses `size.x` as the diameter and `size.y` as the height. City space is not projected onto the globe. The two views meet only through `cityId`.
+`representation` is either a primitive (`box` or `cylinder`, plus a color) or a model (`kind: "model"`, a `.glb` url, and a primitive fallback). A model is scaled to `placement.size` and centered on `placement.position`. The Commons object points at `/models/test-cube.glb`, a generated cube used to exercise that path.
+
+City coordinates are meters in a local space, also Y up. `placement.position` is the center of the mesh. A box uses `size` as width, height, and depth. A cylinder uses `size.x` as the diameter and `size.y` as the height. X is east and Z is north from the city's WGS84 latitude and longitude. Y is local up and is not an ellipsoid height. `localToGeodetic` reads those stored meters. It does not move them, and the globe scene still uses `latLonToVector3` only for the city marker. The Map view draws the same meters on an OpenFreeMap basemap through that conversion. It does not store pixels, tile coordinates, or a second object list.
 
 ## Certainty
 
