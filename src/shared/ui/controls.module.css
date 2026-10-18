@@ -1,0 +1,44 @@
+.button,
+.ghost,
+.toggle {
+  border: 1px solid var(--line);
+  background: var(--bg-raised);
+  border-radius: 8px;
+  padding: 7px 12px;
+  text-decoration: none;
+  color: var(--text);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.button:hover,
+.ghost:hover,
+.toggle:hover { border-color: var(--accent); }
+
+.toggle[aria-pressed='true'],
+.active {
+  background: #243543;
+  border-color: var(--accent);
+  color: var(--accent-strong);
+}
+
+.field,
+.select,
+.area {
+  width: 100%;
+  border: 1px solid var(--line);
+  background: var(--bg-sunken);
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+.area { min-height: 76px; resize: vertical; }
+
+.stack { display: flex; flex-direction: column; gap: 8px; }
+
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+
+.muted { color: var(--muted); font-size: 0.92rem; line-height: 1.45; }
+
+.error { color: var(--danger); font-size: 0.92rem; }

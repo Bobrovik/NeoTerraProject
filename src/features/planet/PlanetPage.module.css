@@ -1,0 +1,50 @@
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 12px;
+  min-height: 0;
+  flex: 1;
+}
+
+.viewport {
+  min-height: 520px;
+  height: calc(100vh - 168px);
+  border-radius: var(--radius);
+  overflow: hidden;
+  border: 1px solid var(--line);
+  background: var(--bg-sunken);
+}
+
+.side { display: flex; flex-direction: column; gap: 10px; min-height: 0; overflow: auto; max-height: calc(100vh - 168px); }
+
+.form { display: flex; flex-direction: column; gap: 8px; }
+
+.field { display: flex; flex-direction: column; gap: 4px; font-size: 0.85rem; color: var(--muted); }
+
+.list { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 0; list-style: none; }
+
+.city {
+  text-align: left;
+  border: 1px solid var(--line);
+  background: var(--bg-raised);
+  border-radius: 10px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: inherit;
+}
+
+.city[aria-pressed='true'] { border-color: var(--accent); }
+
+.card {
+  border: 1px solid var(--line);
+  background: var(--bg-raised);
+  border-radius: var(--radius);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.card p { line-height: 1.45; color: var(--muted); }

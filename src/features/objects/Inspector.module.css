@@ -1,0 +1,27 @@
+.block { display: flex; flex-direction: column; gap: 8px; }
+
+.block p { line-height: 1.45; }
+
+.list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+
+.item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-decoration: none;
+  color: inherit;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 6px;
+}
+
+.item:hover { color: var(--accent-strong); }
+
+.metric { display: flex; justify-content: space-between; gap: 8px; font-size: 0.92rem; }
+
+.hidden {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px;
+  color: var(--warn);
+  font-size: 0.88rem;
+}

@@ -1,0 +1,16 @@
+.badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 0.75rem;
+  letter-spacing: 0.02em;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.verified, .engineeringFact { color: var(--good); border-color: #3e5c4c; }
+.frescoPrinciple { color: #c3b7d8; border-color: #4c4560; }
+.hypothesis { color: var(--warn); border-color: #5c4c32; }
+.demo { color: var(--muted); }

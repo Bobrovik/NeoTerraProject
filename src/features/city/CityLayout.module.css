@@ -1,0 +1,74 @@
+.page { display: flex; flex-direction: column; gap: 10px; min-height: 0; flex: 1; }
+
+.toolbar {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.stage {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 12px;
+  min-height: 0;
+  flex: 1;
+}
+
+.viewport {
+  position: relative;
+  min-height: 520px;
+  height: calc(100vh - 210px);
+  border-radius: var(--radius);
+  overflow: hidden;
+  border: 1px solid var(--line);
+  background: var(--bg-sunken);
+}
+
+.panel {
+  border: 1px solid var(--line);
+  background: var(--bg-raised);
+  border-radius: var(--radius);
+  padding: 14px;
+  overflow: auto;
+  max-height: calc(100vh - 210px);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.legend { display: flex; gap: 8px; align-items: center; color: var(--muted); font-size: 0.85rem; }
+
+.swatch { width: 12px; height: 12px; border-radius: 2px; display: inline-block; flex: none; }
+
+.layers {
+  position: absolute;
+  z-index: 2;
+  top: 10px;
+  left: 10px;
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgb(11 15 19 / 90%);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 168px;
+}
+
+.layersTitle {
+  padding: 0 4px;
+  font-size: 0.75rem;
+  letter-spacing: 0.02em;
+  color: var(--muted);
+}
+
+.layerRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.82rem;
+}
+
+.layerEmpty { margin-left: auto; color: var(--muted); font-size: 0.75rem; }
