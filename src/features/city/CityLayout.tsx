@@ -26,18 +26,21 @@ import { EmptyState, LoadingState } from '../../shared/ui/Status'
 import controls from '../../shared/ui/controls.module.css'
 import { EnergyBalancePanel } from '../systems/EnergyBalancePanel'
 import { InfrastructureLayers } from './InfrastructureLayers'
-import { parseCityView } from './city-view'
+import { ExportCityButton, ImportCityButton } from './CityFileActions'
+import { cityBasePath, parseCityView, type CityIntent } from './city-view'
 import { defaultInfrastructureLayers, flowsForLayers, linkLayerEntries, type InfrastructureLayersState } from './layers'
 import styles from './CityLayout.module.css'
 
-export function CityLayout() {
+export function CityLayout({ intent }: { intent: CityIntent }) {
+  const editing = intent === 'edit'
   const { snapshot, drafts, editCity, layoutSaved, layoutNote, resetCityLayout, exportLayouts, replaceLayouts } = useReadyCatalog()
   const { cityId, objectId } = useParams()
   const [searchParams, setSearchParams] = useSearchParams()
   const navigate = useNavigate()
   const fileRef = useRef<HTMLInputElement>(null)
   const city = cityId ? getCity(snapshot, cityId) : undefined
-  const mode = parseCityView(searchParams.get('view'))
+  const parsedMode = parseCityView(searchParams.get('view'))
+  const mode = !editing && (parsedMode === 'layout' || parsedMode === 'systems') ? 'overview' : parsedMode
   const category = searchParams.get('category')
   const [tool, setTool] = useState<LayoutTool>('select')
   const [templateId, setTemplateId] = useState(buildingTemplates[0]?.id ?? '')
@@ -135,7 +138,7 @@ export function CityLayout() {
 
   function selectObject(nextObjectId: string) {
     const search = searchParams.toString()
-    navigate({ pathname: `/cities/${selectedCity.id}/objects/${nextObjectId}`, search: search ? `?${search}` : '' })
+    navigate({ pathname: `${cityBasePath(editing, selectedCity.id)}/objects/${nextObjectId}`, search: search ? `?${search}` : '' })
   }
 
   function apply(change: Parameters<typeof editCity>[1]) {
@@ -166,7 +169,7 @@ export function CityLayout() {
     }
     if (objectId) {
       setEditorMessage(editCity(targetCityId, (draft) => deleteObject(draft, objectId)))
-      navigate({ pathname: `/cities/${targetCityId}`, search: searchParams.toString() ? `?${searchParams.toString()}` : '' })
+      navigate({ pathname: cityBasePath(editing, targetCityId), search: searchParams.toString() ? `?${searchParams.toString()}` : '' })
     }
   }
 
@@ -188,11 +191,29 @@ export function CityLayout() {
         <div className={controls.stack}>
           <div className={controls.row} role="group" aria-label="View mode">
             <button type="button" className={controls.toggle} aria-pressed={mode === 'overview'} onClick={() => setParam('view', null)}>Overview</button>
-            <button type="button" className={controls.toggle} aria-pressed={mode === 'layout'} onClick={() => setParam('view', 'layout')}>Layout</button>
-            <button type="button" className={controls.toggle} aria-pressed={mode === 'systems'} onClick={() => setParam('view', 'systems')}>Systems</button>
+            {editing ? <button type="button" className={controls.toggle} aria-pressed={mode === 'layout'} onClick={() => setParam('view', 'layout')}>Layout</button> : null}
+            {editing ? <button type="button" className={controls.toggle} aria-pressed={mode === 'systems'} onClick={() => setParam('view', 'systems')}>Systems</button> : null}
             <button type="button" className={controls.toggle} aria-pressed={mode === 'map'} onClick={() => setParam('view', 'map')}>Map</button>
           </div>
-          {mode === 'map' ? (
+          <div className={controls.row}>
+            {editing ? (
+              <Link className={controls.ghost} to={{ pathname: `/cities/${selectedCity.id}`, search: searchParams.toString() ? `?${searchParams}` : '' }}>Open in viewer</Link>
+            ) : (
+              <Link className={controls.ghost} to={{ pathname: objectId ? `/editor/${selectedCity.id}/objects/${objectId}` : `/editor/${selectedCity.id}`, search: searchParams.toString() ? `?${searchParams}` : '' }}>Open in editor</Link>
+            )}
+            <ExportCityButton cityId={selectedCity.id} />
+            <ImportCityButton
+              onImported={(result) => {
+                if (!result.ok) {
+                  setEditorMessage(result.message)
+                  return
+                }
+                setEditorMessage(undefined)
+                navigate(cityBasePath(editing, result.cityId))
+              }}
+            />
+          </div>
+          {editing && mode === 'map' ? (
             <div className={controls.stack}>
               <div className={controls.row} role="group" aria-label="Building catalog">
                 {buildingTemplates.map((item) => (
@@ -219,7 +240,7 @@ export function CityLayout() {
                 </button>
               </div>
             </div>
-          ) : mode !== 'layout' ? (
+          ) : mode === 'overview' || mode === 'systems' ? (
             <div className={controls.row} role="group" aria-label="Categories">
               <button type="button" className={controls.toggle} aria-pressed={!category} onClick={() => setParam('category', null)}>All</button>
               {categories.map((item) => (
@@ -228,7 +249,7 @@ export function CityLayout() {
                 </button>
               ))}
             </div>
-          ) : (
+          ) : editing && mode === 'layout' ? (
             <div className={controls.stack}>
               <div className={controls.row} role="group" aria-label="Layout tool">
                 <button type="button" className={controls.toggle} aria-pressed={tool === 'select'} onClick={() => setTool('select')}>Select</button>
@@ -268,7 +289,7 @@ export function CityLayout() {
                 />
               </div>
             </div>
-          )}
+          ) : null}
         </div>
         {mode === 'systems' ? (
           <div className={styles.legend}>
@@ -282,16 +303,18 @@ export function CityLayout() {
             {mode === 'layout'
               ? `Grid is ${GRID_METERS} m. ${tool === 'place' && template ? `Placing ${template.name}. ` : ''}Roads are physical routes and do not create resource links.`
               : mode === 'map'
-                ? mapPick
-                  ? `${mapPick.latitude.toFixed(5)}°, ${mapPick.longitude.toFixed(5)}° → ${mapPick.east.toFixed(1)} m east, ${mapPick.north.toFixed(1)} m north. Stored on the ${GRID_METERS} m grid as ${snapToGrid(mapPick.east).toFixed(0)} m east, ${snapToGrid(mapPick.north).toFixed(0)} m north.`
-                  : 'Click the map to choose a point. Objects stay in local meters.'
+                ? editing
+                  ? mapPick
+                    ? `${mapPick.latitude.toFixed(5)}°, ${mapPick.longitude.toFixed(5)}° → ${mapPick.east.toFixed(1)} m east, ${mapPick.north.toFixed(1)} m north. Stored on the ${GRID_METERS} m grid as ${snapToGrid(mapPick.east).toFixed(0)} m east, ${snapToGrid(mapPick.north).toFixed(0)} m north.`
+                    : 'Click the map to choose a point. Objects stay in local meters.'
+                  : 'The map shows the saved city. Placement stays in the editor.'
                 : 'Simple shapes stand in for buildings.'}
-            {layoutSaved ? ' Edits are saved in this browser.' : ''}
+            {editing && layoutSaved ? ' Edits are saved in this browser.' : ''}
           </p>
         )}
       </div>
       {editorMessage || layoutNote || mapMessage ? <p className={controls.error}>{editorMessage ?? mapMessage ?? layoutNote}</p> : null}
-      <div className={styles.stage}>
+      <div className={editing ? styles.stage : styles.stageWide}>
         <div className={styles.viewport}>
           {mode === 'map' ? null : (
             <button type="button" className={styles.energyToggle} aria-pressed={energyView} onClick={() => setEnergyView((current) => !current)}>
@@ -336,13 +359,13 @@ export function CityLayout() {
                 showRoads={layers.roads}
                 resourceTypes={snapshot.resourceTypes}
                 mode={mode}
-                camera={camera}
-                tool={tool}
+                camera={editing ? camera : 'perspective'}
+                tool={editing ? tool : 'select'}
                 selectedId={objectId ?? null}
                 selectedRoadId={selectedRoadId}
                 selectedPointIndex={selectedPointIndex}
                 onSelect={(nextObjectId) => {
-                  if (mode === 'layout' && tool === 'road') {
+                  if (editing && mode === 'layout' && tool === 'road') {
                     addRoadPoint({ kind: 'object', objectId: nextObjectId })
                     return
                   }
@@ -351,6 +374,9 @@ export function CityLayout() {
                   selectObject(nextObjectId)
                 }}
                 onGround={(x, z) => {
+                  if (!editing) {
+                    return
+                  }
                   if (tool === 'place' && template) {
                     const id = `object:${selectedCity.id.split(':')[1]}:${crypto.randomUUID()}`
                     apply((draft) => placeObject(draft, template, x, z, id))
@@ -361,26 +387,55 @@ export function CityLayout() {
                     addRoadPoint({ kind: 'control', x: snapToGrid(x), z: snapToGrid(z) })
                   }
                 }}
-                onMoveObject={(nextObjectId, x, z) => apply((draft) => moveObject(draft, nextObjectId, x, z))}
+                onMoveObject={(nextObjectId, x, z) => {
+                  if (editing) {
+                    apply((draft) => moveObject(draft, nextObjectId, x, z))
+                  }
+                }}
                 onSelectRoadPoint={(roadId, index) => {
                   setSelectedRoadId(roadId)
                   setSelectedPointIndex(index)
                 }}
-                onMoveRoadPoint={(roadId, index, x, z) => apply((draft) => moveRoadControl(draft, roadId, index, x, z))}
+                onMoveRoadPoint={(roadId, index, x, z) => {
+                  if (editing) {
+                    apply((draft) => moveRoadControl(draft, roadId, index, x, z))
+                  }
+                }}
                 energyView={energyView}
                 energyLines={energyLines}
                 energyTones={energyTones}
-                selectionCard={selectionCard}
+                selectionCard={editing || energyView ? selectionCard : null}
               />
             </SceneBoundary>
           )}
+          {!editing && selectedObject && (mode === 'map' || visibleObjects.some((object) => object.id === selectedObject.id)) ? (
+            <SelectionCard
+              name={selectedObject.name}
+              purpose={categories.find((item) => item.id === selectedObject.categoryId)?.name ?? selectedObject.categoryId}
+              description={selectedObject.description}
+              metrics={electricityReport ? electricitySelection(selectedObject, electricityReport).lines : []}
+            />
+          ) : null}
         </div>
-        <aside className={styles.panel}>
-          {mode === 'systems' ? <EnergyBalancePanel cityId={selectedCity.id} /> : null}
-          <Outlet />
-        </aside>
+        {editing ? (
+          <aside className={styles.panel}>
+            {mode === 'systems' ? <EnergyBalancePanel cityId={selectedCity.id} /> : null}
+            <Outlet />
+          </aside>
+        ) : null}
       </div>
     </div>
+  )
+}
+
+function SelectionCard({ name, purpose, description, metrics }: { name: string; purpose: string; description: string; metrics: string[] }) {
+  return (
+    <section className={styles.selectionCard} aria-label="Selected object">
+      <p className={styles.selectionTitle}>{name}</p>
+      <p className={styles.selectionPurpose}>{purpose}</p>
+      <p className={styles.selectionBody}>{description}</p>
+      {metrics.map((line) => <p key={line} className={styles.selectionMetric}>{line}</p>)}
+    </section>
   )
 }
 

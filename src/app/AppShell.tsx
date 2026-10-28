@@ -10,6 +10,7 @@ import styles from './AppShell.module.css'
 const links = [
   { to: '/', label: 'Home', end: true },
   { to: '/planet', label: 'Planet', end: false },
+  { to: '/editor', label: 'Editor', end: false },
   { to: '/documents', label: 'Documents', end: false },
   { to: '/tasks', label: 'Tasks', end: false },
   { to: '/about', label: 'About', end: false },

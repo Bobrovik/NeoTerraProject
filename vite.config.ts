@@ -43,8 +43,18 @@ function mapLibreWorker(): Plugin {
   }
 }
 
+const ucdpProxy = {
+  '/ucdp-feed': {
+    target: 'https://ucdp.uu.se',
+    changeOrigin: true,
+    rewrite: (path: string) => path.replace(/^\/ucdp-feed/, ''),
+  },
+}
+
 export default defineConfig({
   plugins: [react(), mapLibreWorker()],
+  server: { proxy: ucdpProxy },
+  preview: { proxy: ucdpProxy },
   test: {
     environment: 'node',
     include: ['src/**/*.test.ts'],

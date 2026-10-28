@@ -12,7 +12,7 @@ export type OceanLabel = {
   longitude: number
 }
 
-/** Static regional highlight. The app has no live conflict feed. */
+/** Kept for the geometry test. These boxes are not drawn: they cover whole regions and are not a conflict feed. */
 export const conflictZones: ConflictZone[] = [
   { id: 'ukraine', name: 'Ukraine', ring: [[22, 52.2], [40.2, 52.2], [40.2, 44.2], [22, 44.2], [22, 52.2]] },
   { id: 'levant', name: 'Levant', ring: [[34.2, 33.4], [36.4, 33.4], [36.4, 29.4], [34.2, 29.4], [34.2, 33.4]] },

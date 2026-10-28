@@ -4,7 +4,7 @@ import { createProjectTask } from '../domain/tasks'
 import type { CatalogSnapshot, CatalogSource, City, ProjectTask } from '../domain/types'
 import { applyStoredLayouts, collectStoredLayoutIssues, createUserCity, emptyCityDraft } from '../domain/user-city'
 import { CatalogContext, type CatalogState, type ReadyCatalog } from './catalog-context'
-import { parseLayout, readStoredLayout, serializeLayout, writeStoredLayout } from './layout-storage'
+import { commitCityImport, parseCityProject, parseLayout, readStoredLayout, serializeCityProject, serializeLayout, writeStoredLayout } from './layout-storage'
 
 export function CatalogProvider({ source, children }: { source: CatalogSource; children: ReactNode }) {
   const [loaded, setLoaded] = useState<Exclude<CatalogState, ReadyCatalog> | { status: 'ready'; snapshot: CatalogSnapshot }>(
@@ -136,6 +136,29 @@ export function CatalogProvider({ source, children }: { source: CatalogSource; c
         remember(drafts.filter((item) => item.cityId !== cityId), userCities)
       },
       exportLayouts: () => serializeLayout({ drafts, cities: userCities }),
+      exportCity: (cityId) => {
+        const city = snapshot.cities.find((item) => item.id === cityId)
+        const draft = drafts.find((item) => item.cityId === cityId) ?? (city ? draftFromSnapshot(snapshot, cityId) : undefined)
+        if (!city || !draft) {
+          return undefined
+        }
+        return serializeCityProject(city, draft)
+      },
+      importCity: (raw, choice) => {
+        const parsed = parseCityProject(raw, base)
+        if (!parsed.ok) {
+          return parsed
+        }
+        const committed = commitCityImport({ drafts, cities: userCities }, parsed.project, base, choice)
+        if (!committed.ok) {
+          return committed
+        }
+        writeStoredLayout(committed.stored)
+        setDrafts(committed.stored.drafts)
+        setUserCities(committed.stored.cities)
+        setLayoutNote(undefined)
+        return { ok: true, cityId: committed.cityId }
+      },
     }
   }, [loaded, sessionTasks, drafts, userCities, layoutNote])
 

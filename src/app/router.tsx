@@ -1,6 +1,7 @@
 /* eslint-disable react-refresh/only-export-components */
 import { lazy, Suspense, type ReactNode } from 'react'
-import { createBrowserRouter } from 'react-router'
+import { createBrowserRouter, type RouteObject } from 'react-router'
+import type { CityIntent } from '../features/city/city-view'
 import { AboutPage } from '../features/about/AboutPage'
 import { DocumentListPage } from '../features/documents/DocumentListPage'
 import { DocumentPage } from '../features/documents/DocumentPage'
@@ -15,9 +16,23 @@ import { AppShell } from './AppShell'
 
 const PlanetPage = lazy(() => import('../features/planet/PlanetPage').then((module) => ({ default: module.PlanetPage })))
 const CityLayout = lazy(() => import('../features/city/CityLayout').then((module) => ({ default: module.CityLayout })))
+const CityEditorHome = lazy(() => import('../features/city/CityEditorHome').then((module) => ({ default: module.CityEditorHome })))
 
 function LazyView({ children }: { children: ReactNode }) {
   return <Suspense fallback={<LoadingState label="Loading view…" />}>{children}</Suspense>
+}
+
+function cityRoutes(intent: CityIntent): RouteObject[] {
+  return [
+    {
+      element: <LazyView><CityLayout intent={intent} /></LazyView>,
+      children: [
+        { index: true, element: <CitySummary /> },
+        { path: 'objects/:objectId', element: <ObjectInspector /> },
+      ],
+    },
+    { path: 'systems/:systemId', element: <SystemPage /> },
+  ]
 }
 
 export const router = createBrowserRouter([
@@ -27,17 +42,12 @@ export const router = createBrowserRouter([
     children: [
       { index: true, element: <HomePage /> },
       { path: 'planet', element: <LazyView><PlanetPage /></LazyView> },
+      { path: 'cities/:cityId', children: cityRoutes('view') },
       {
-        path: 'cities/:cityId',
+        path: 'editor',
         children: [
-          {
-            element: <LazyView><CityLayout /></LazyView>,
-            children: [
-              { index: true, element: <CitySummary /> },
-              { path: 'objects/:objectId', element: <ObjectInspector /> },
-            ],
-          },
-          { path: 'systems/:systemId', element: <SystemPage /> },
+          { index: true, element: <LazyView><CityEditorHome /></LazyView> },
+          { path: ':cityId', children: cityRoutes('edit') },
         ],
       },
       { path: 'documents', element: <DocumentListPage /> },

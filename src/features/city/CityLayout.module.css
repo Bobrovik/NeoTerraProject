@@ -15,6 +15,50 @@
   flex: 1;
 }
 
+.stageWide {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-height: 0;
+  flex: 1;
+}
+
+.selectionCard {
+  position: absolute;
+  z-index: 2;
+  right: 10px;
+  bottom: 10px;
+  width: 260px;
+  margin: 0;
+  padding: 8px 10px 9px;
+  border: 1px solid rgb(142 184 212 / 45%);
+  border-radius: 8px;
+  background: rgb(8 12 16 / 78%);
+  color: var(--text);
+  pointer-events: none;
+}
+
+.selectionTitle {
+  margin: 0;
+  font-size: 0.92rem;
+}
+
+.selectionPurpose,
+.selectionMetric {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.selectionBody {
+  display: -webkit-box;
+  margin: 6px 0 0;
+  overflow: hidden;
+  font-size: 0.8rem;
+  line-height: 1.35;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+}
+
 .viewport {
   position: relative;
   min-height: 520px;

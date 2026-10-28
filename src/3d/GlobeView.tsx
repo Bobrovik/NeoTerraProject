@@ -1,28 +1,56 @@
 import { Html, OrbitControls } from '@react-three/drei'
 import { Canvas, useFrame } from '@react-three/fiber'
 import { useLayoutEffect, useMemo, useRef } from 'react'
-import { BufferAttribute, BufferGeometry, DoubleSide, Mesh, MeshBasicMaterial, MeshStandardMaterial, Quaternion, Vector3 } from 'three'
+import { BufferAttribute, BufferGeometry, Camera, Color, DoubleSide, InstancedMesh, Mesh, MeshBasicMaterial, MeshStandardMaterial, Object3D, PerspectiveCamera, Quaternion, SRGBColorSpace, Vector3 } from 'three'
 import { latLonToVector3 } from '../domain/geo'
-import type { City } from '../domain/types'
-import { coasts, countries, fanFromRing, lineSegmentsFromRings, ribbonFromRings, type MapCountry } from './borders'
-import { conflictZones, oceans } from './globe-marks'
+import type { CountryShade } from '../domain/country-shade'
+import { symbolTriangles, type MineralSymbol } from '../domain/mineral-symbols'
+import type { City, Vec3 } from '../domain/types'
+import { coasts, countries, countryShadeAttributes, fanFromRing, lineSegmentsFromRings, ribbonFromRings, type MapCountry, type MapRing } from './borders'
+import { oceans } from './globe-marks'
 import { StarField } from './StarField'
 
 const RADIUS = 1
 
 const countryLines = lineSegmentsFromRings(countries.flatMap((country) => country.rings), RADIUS * 1.012)
 const continentEdges = ribbonFromRings(coasts, RADIUS * 1.02, 0.008)
-const conflictFill = concatFloats(conflictZones.map((zone) => fanFromRing(zone.ring, RADIUS * 1.025)))
-const conflictEdges = ribbonFromRings(conflictZones.map((zone) => zone.ring), RADIUS * 1.03, 0.0035)
 
 export function GlobeView({
   cities,
   selectedId,
   onSelect,
+  selectedCountryName,
+  onSelectCountry,
+  showFlags = false,
+  showWater = false,
+  rivers = [],
+  lakes = [],
+  conflictPoints = [],
+  depositPoints = [],
+  populationShades = [],
+  forestShades = [],
+  populationOpacity = 0.82,
+  forestOpacity = 0.82,
+  onSelectConflict,
+  onSelectDeposit,
 }: {
   cities: City[]
   selectedId: string | null
   onSelect: (cityId: string) => void
+  selectedCountryName: string | null
+  onSelectCountry: (name: string) => void
+  showFlags?: boolean
+  showWater?: boolean
+  rivers?: MapRing[]
+  lakes?: MapRing[]
+  conflictPoints?: SurfacePoint[]
+  depositPoints?: DepositPoint[]
+  populationShades?: CountryShade[]
+  forestShades?: CountryShade[]
+  populationOpacity?: number
+  forestOpacity?: number
+  onSelectConflict?: (id: string) => void
+  onSelectDeposit?: (id: string) => void
 }) {
   return (
     <Canvas camera={{ position: [0, 0.4, 3.1], fov: 45 }} dpr={[1, 1.5]}>
@@ -34,14 +62,18 @@ export function GlobeView({
         <sphereGeometry args={[RADIUS, 64, 48]} />
         <meshStandardMaterial color="#0d4a66" roughness={0.9} metalness={0.04} />
       </mesh>
-      <LineSegments positions={countryLines} color="#7f97a8" />
+      <LineSegments positions={countryLines} color="#7f97a8" renderOrder={8} />
       <Ribbon positions={continentEdges} color="#f4f7fb" />
-      <ConflictLayer />
+      {populationShades.length > 0 ? <CountryShadeLayer shades={populationShades} radius={RADIUS * 1.005} opacity={populationOpacity} renderOrder={2} /> : null}
+      {forestShades.length > 0 ? <CountryShadeLayer shades={forestShades} radius={RADIUS * 1.009} opacity={forestOpacity} renderOrder={3} /> : null}
+      {showWater ? <WaterLayer rivers={rivers} lakes={lakes} /> : null}
+      {conflictPoints.length > 0 ? <SurfacePoints points={conflictPoints} onSelect={onSelectConflict} /> : null}
+      {depositPoints.length > 0 ? <DepositSymbols points={depositPoints} onSelect={onSelectDeposit} /> : null}
       {oceans.map((ocean) => (
         <MapLabel key={ocean.name} latitude={ocean.latitude} longitude={ocean.longitude} text={ocean.name} />
       ))}
       {countries.map((country) => (
-        <CountryLabel key={`${country.iso}-${country.name}`} country={country} />
+        <CountryLabel key={`${country.iso}-${country.name}`} country={country} selected={country.name === selectedCountryName} showFlag={showFlags} onSelect={onSelectCountry} />
       ))}
       {cities.map((city) => (
         <CityBeacon key={city.id} city={city} selected={city.id === selectedId} onSelect={onSelect} />
@@ -51,7 +83,7 @@ export function GlobeView({
   )
 }
 
-function LineSegments({ positions, color }: { positions: Float32Array; color: string }) {
+function LineSegments({ positions, color, renderOrder = 0 }: { positions: Float32Array; color: string; renderOrder?: number }) {
   const geometry = useMemo(() => {
     const next = new BufferGeometry()
     next.setAttribute('position', new BufferAttribute(positions, 3))
@@ -59,9 +91,28 @@ function LineSegments({ positions, color }: { positions: Float32Array; color: st
   }, [positions])
   useLayoutEffect(() => () => geometry.dispose(), [geometry])
   return (
-    <lineSegments geometry={geometry} raycast={() => null}>
+    <lineSegments geometry={geometry} renderOrder={renderOrder} raycast={() => null}>
       <lineBasicMaterial color={color} />
     </lineSegments>
+  )
+}
+
+function CountryShadeLayer({ shades, radius, opacity, renderOrder }: { shades: CountryShade[]; radius: number; opacity: number; renderOrder: number }) {
+  const geometry = useMemo(() => {
+    const attributes = countryShadeAttributes(shades, radius)
+    const next = new BufferGeometry()
+    next.setAttribute('position', new BufferAttribute(attributes.positions, 3))
+    next.setAttribute('color', new BufferAttribute(displayColorsToLinear(attributes.colors), 3))
+    return next
+  }, [shades, radius])
+  useLayoutEffect(() => () => geometry.dispose(), [geometry])
+  if (geometry.getAttribute('position').count === 0) {
+    return null
+  }
+  return (
+    <mesh geometry={geometry} renderOrder={renderOrder} raycast={() => null}>
+      <meshBasicMaterial vertexColors toneMapped={false} transparent opacity={opacity} depthWrite={false} side={DoubleSide} />
+    </mesh>
   )
 }
 
@@ -79,38 +130,63 @@ function Ribbon({ positions, color }: { positions: Float32Array; color: string }
   )
 }
 
-function ConflictLayer() {
-  const fill = useRef<MeshBasicMaterial>(null)
-  const edge = useRef<MeshBasicMaterial>(null)
-  const fillGeometry = useMemo(() => geometryFrom(conflictFill), [])
-  const edgeGeometry = useMemo(() => geometryFrom(conflictEdges), [])
+function WaterLayer({ rivers, lakes }: { rivers: MapRing[]; lakes: MapRing[] }) {
+  const riverGeometry = useMemo(() => geometryFrom(lineSegmentsFromRings(rivers, RADIUS * 1.02)), [rivers])
+  const lakeGeometry = useMemo(() => geometryFrom(concatFloats(lakes.map((ring) => fanFromRing(ring, RADIUS * 1.018)))), [lakes])
   useLayoutEffect(() => () => {
-    fillGeometry.dispose()
-    edgeGeometry.dispose()
-  }, [fillGeometry, edgeGeometry])
-  useFrame(({ clock }) => {
-    const pulse = 0.45 + 0.55 * (0.5 + 0.5 * Math.sin(clock.elapsedTime * 2.4))
-    if (fill.current) {
-      fill.current.opacity = 0.22 + pulse * 0.28
-    }
-    if (edge.current) {
-      edge.current.opacity = 0.55 + pulse * 0.45
-    }
-  })
+    riverGeometry.dispose()
+    lakeGeometry.dispose()
+  }, [riverGeometry, lakeGeometry])
+  if (rivers.length === 0 && lakes.length === 0) {
+    return null
+  }
   return (
     <>
-      <mesh geometry={fillGeometry} raycast={() => null}>
-        <meshBasicMaterial ref={fill} color="#ff2430" transparent opacity={0.4} depthWrite={false} side={DoubleSide} />
+      <mesh geometry={lakeGeometry} raycast={() => null}>
+        <meshBasicMaterial color="#1c7c9c" transparent opacity={0.45} depthWrite={false} side={DoubleSide} />
       </mesh>
-      <mesh geometry={edgeGeometry} raycast={() => null}>
-        <meshBasicMaterial ref={edge} color="#ff5a62" transparent opacity={0.9} depthWrite={false} side={DoubleSide} />
-      </mesh>
+      <lineSegments geometry={riverGeometry} raycast={() => null}>
+        <lineBasicMaterial color="#9fd0e4" />
+      </lineSegments>
     </>
   )
 }
 
-function CountryLabel({ country }: { country: MapCountry }) {
-  const label = useRef<HTMLDivElement>(null)
+function SurfacePoints({ points, onSelect }: { points: SurfacePoint[]; onSelect?: (id: string) => void }) {
+  const geometry = useMemo(() => {
+    const positions = new Float32Array(points.length * 3)
+    const colors = new Float32Array(points.length * 3)
+    points.forEach((point, index) => {
+      const position = latLonToVector3(point.latitude, point.longitude, RADIUS * 1.03)
+      positions.set([position.x, position.y, position.z], index * 3)
+      const color = hexColor(point.color)
+      colors.set(color, index * 3)
+    })
+    const next = new BufferGeometry()
+    next.setAttribute('position', new BufferAttribute(positions, 3))
+    next.setAttribute('color', new BufferAttribute(colors, 3))
+    return next
+  }, [points])
+  useLayoutEffect(() => () => geometry.dispose(), [geometry])
+  return (
+    <points
+      geometry={geometry}
+      onClick={(event) => {
+        event.stopPropagation()
+        const index = event.index
+        const point = index === undefined ? undefined : points[index]
+        if (point && onSelect) {
+          onSelect(point.id)
+        }
+      }}
+    >
+      <pointsMaterial vertexColors size={5} sizeAttenuation={false} depthWrite={false} />
+    </points>
+  )
+}
+
+function CountryLabel({ country, selected, showFlag, onSelect }: { country: MapCountry; selected: boolean; showFlag: boolean; onSelect: (name: string) => void }) {
+  const label = useRef<HTMLButtonElement>(null)
   const position = useMemo(() => latLonToVector3(country.label[1], country.label[0], RADIUS * 1.045), [country])
   useFrame(({ camera }) => {
     const element = label.current
@@ -122,10 +198,16 @@ function CountryLabel({ country }: { country: MapCountry }) {
   })
   return (
     <Html position={[position.x, position.y, position.z]} center distanceFactor={1.15} zIndexRange={[8, 0]} style={{ pointerEvents: 'none' }}>
-      <div ref={label} style={{ display: 'flex', alignItems: 'center', gap: 3, color: '#f4f7fb', fontSize: 11, lineHeight: 1, whiteSpace: 'nowrap', textShadow: '0 1px 2px #000' }}>
-        <img src={`/flags/${country.iso.toLowerCase()}.svg`} alt="" width={12} height={8} />
+      <button
+        ref={label}
+        type="button"
+        aria-pressed={selected}
+        onClick={() => onSelect(country.name)}
+        style={{ display: 'flex', alignItems: 'center', gap: 3, padding: 0, border: 0, background: 'transparent', color: selected ? '#fff4c2' : '#f4f7fb', font: 'inherit', fontSize: 11, lineHeight: 1, whiteSpace: 'nowrap', textShadow: '0 1px 2px #000', pointerEvents: 'auto', cursor: 'pointer' }}
+      >
+        {showFlag ? <img src={`/flags/${country.iso.toLowerCase()}.svg`} alt="" width={12} height={8} /> : null}
         <span>{country.name}</span>
-      </div>
+      </button>
     </Html>
   )
 }
@@ -186,6 +268,127 @@ function CityBeacon({ city, selected, onSelect }: { city: City; selected: boolea
       </mesh>
     </group>
   )
+}
+
+export type SurfacePoint = {
+  id: string
+  latitude: number
+  longitude: number
+  color: string
+}
+
+export type DepositPoint = SurfacePoint & {
+  symbol: MineralSymbol
+}
+
+const symbolMarker = new Object3D()
+
+function DepositSymbols({ points, onSelect }: { points: DepositPoint[]; onSelect?: (id: string) => void }) {
+  const groups = useMemo(() => {
+    const bySymbol = new Map<MineralSymbol, DepositPoint[]>()
+    for (const point of points) {
+      const list = bySymbol.get(point.symbol)
+      if (list) {
+        list.push(point)
+      } else {
+        bySymbol.set(point.symbol, [point])
+      }
+    }
+    return [...bySymbol.entries()]
+  }, [points])
+  return groups.map(([symbol, group]) => <SymbolSet key={`${symbol}-${group.length}`} points={group} onSelect={onSelect} />)
+}
+
+function SymbolSet({ points, onSelect }: { points: DepositPoint[]; onSelect?: (id: string) => void }) {
+  const mesh = useRef<InstancedMesh>(null)
+  const symbol = points[0].symbol
+  const color = points[0].color
+  const geometry = useMemo(() => {
+    const next = new BufferGeometry()
+    next.setAttribute('position', new BufferAttribute(symbolTriangles(symbol), 3))
+    return next
+  }, [symbol])
+  const material = useMemo(() => new MeshBasicMaterial({ color, side: DoubleSide, depthWrite: false }), [color])
+  const positions = useMemo(
+    () => points.map((point) => latLonToVector3(point.latitude, point.longitude, RADIUS * 1.035)),
+    [points],
+  )
+  useLayoutEffect(() => () => {
+    geometry.dispose()
+    material.dispose()
+  }, [geometry, material])
+  useLayoutEffect(() => {
+    placeSymbols(mesh.current, positions, 0.02)
+  }, [positions])
+  useFrame(({ camera, size }) => {
+    if (!(camera instanceof PerspectiveCamera)) {
+      return
+    }
+    const factor = (11 * Math.tan((camera.fov * Math.PI) / 360)) / Math.max(size.height, 1)
+    placeSymbols(mesh.current, positions, factor, camera)
+  })
+  return (
+    <instancedMesh
+      ref={mesh}
+      args={[geometry, material, points.length]}
+      geometry={geometry}
+      material={material}
+      dispose={null}
+      frustumCulled={false}
+      renderOrder={6}
+      onClick={(event) => {
+        event.stopPropagation()
+        const index = event.instanceId
+        const point = index === undefined ? undefined : points[index]
+        if (point && onSelect) {
+          onSelect(point.id)
+        }
+      }}
+      onPointerOver={() => {
+        document.body.style.cursor = 'pointer'
+      }}
+      onPointerOut={() => {
+        document.body.style.cursor = ''
+      }}
+    />
+  )
+}
+
+function placeSymbols(mesh: InstancedMesh | null, positions: Vec3[], factor: number, camera?: Camera) {
+  if (!mesh) {
+    return
+  }
+  positions.forEach((position, index) => {
+    symbolMarker.position.set(position.x, position.y, position.z)
+    if (camera) {
+      const distance = Math.hypot(position.x - camera.position.x, position.y - camera.position.y, position.z - camera.position.z)
+      symbolMarker.lookAt(camera.position)
+      symbolMarker.scale.setScalar(Math.max(distance, 0.05) * factor)
+    } else {
+      symbolMarker.rotation.set(0, 0, 0)
+      symbolMarker.scale.setScalar(factor)
+    }
+    symbolMarker.updateMatrix()
+    mesh.setMatrixAt(index, symbolMarker.matrix)
+  })
+  mesh.instanceMatrix.needsUpdate = true
+}
+
+function displayColorsToLinear(colors: Float32Array): Float32Array {
+  const color = new Color()
+  const linear = new Float32Array(colors.length)
+  for (let index = 0; index < colors.length; index += 3) {
+    color.setRGB(colors[index], colors[index + 1], colors[index + 2], SRGBColorSpace)
+    linear[index] = color.r
+    linear[index + 1] = color.g
+    linear[index + 2] = color.b
+  }
+  return linear
+}
+
+function hexColor(value: string): [number, number, number] {
+  const hex = value.replace('#', '')
+  return [Number.parseInt(hex.slice(0, 2), 16) / 255, Number.parseInt(hex.slice(2, 4), 16) / 255, Number.parseInt(hex.slice(4, 6), 16) / 255]
 }
 
 function geometryFrom(positions: Float32Array): BufferGeometry {

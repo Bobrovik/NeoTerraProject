@@ -20,6 +20,7 @@ export function HomePage() {
         </p>
         <div className={controls.row}>
           <Link className={controls.button} to="/planet">Open the planet</Link>
+          <Link className={controls.ghost} to="/editor">Design a city</Link>
           <Link className={controls.ghost} to="/documents">Read the notes</Link>
         </div>
       </section>

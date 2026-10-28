@@ -1,4 +1,5 @@
 import { Link, useLocation, useParams } from 'react-router'
+import { isCityEditorPath } from '../../features/city/city-view'
 import { getCity, getDocument, getObject, getSystem } from '../../domain/queries'
 import { useReadyCatalog } from '../../data/useCatalog'
 import styles from './Breadcrumbs.module.css'
@@ -17,6 +18,17 @@ export function Breadcrumbs() {
     crumbs.push({ label: 'Home' })
   } else if (location.pathname.startsWith('/planet')) {
     crumbs.push({ label: 'Home', to: '/' }, { label: 'Planet' })
+  } else if (isCityEditorPath(location.pathname)) {
+    crumbs.push({ label: 'Editor', to: '/editor' })
+    if (city) {
+      crumbs.push({ label: city.name, to: `/editor/${city.id}${location.search}` })
+      if (object) {
+        crumbs.push({ label: object.name })
+      }
+      if (system) {
+        crumbs.push({ label: system.name })
+      }
+    }
   } else if (city) {
     crumbs.push({ label: 'Planet', to: '/planet' }, { label: city.name, to: `/cities/${city.id}${location.search}` })
     if (object) {

@@ -1,15 +1,18 @@
-import { Link, useParams, useSearchParams } from 'react-router'
+import { Link, useLocation, useParams, useSearchParams } from 'react-router'
 import { useReadyCatalog } from '../../data/useCatalog'
 import { getCategory, getCity, objectsForCity, systemsForCity } from '../../domain/queries'
 import { developmentStatusLabel } from '../../shared/labels'
 import { ReliabilityBadge } from '../../shared/ui/ReliabilityBadge'
 import { EmptyState } from '../../shared/ui/Status'
+import { cityBasePath, isCityEditorPath } from '../city/city-view'
 import controls from '../../shared/ui/controls.module.css'
 import styles from './Inspector.module.css'
 
 export function CitySummary() {
   const { snapshot } = useReadyCatalog()
   const { cityId } = useParams()
+  const location = useLocation()
+  const editing = isCityEditorPath(location.pathname)
   const [searchParams] = useSearchParams()
   const city = cityId ? getCity(snapshot, cityId) : undefined
   if (!city) {
@@ -18,6 +21,7 @@ export function CitySummary() {
   const objects = objectsForCity(snapshot, city.id)
   const systems = systemsForCity(snapshot, city.id)
   const search = searchParams.toString()
+  const base = cityBasePath(editing, city.id)
 
   return (
     <div className={styles.block}>
@@ -35,7 +39,7 @@ export function CitySummary() {
           <ul className={styles.list}>
             {systems.map((system) => (
               <li key={system.id}>
-                <Link className={styles.item} to={`/cities/${city.id}/systems/${system.id}`}>
+                <Link className={styles.item} to={`${base}/systems/${system.id}`}>
                   <strong>{system.name}</strong>
                   <span className={controls.muted}>{system.kind}</span>
                 </Link>
@@ -51,7 +55,7 @@ export function CitySummary() {
             const category = getCategory(snapshot, object.categoryId)
             return (
               <li key={object.id}>
-                <Link className={styles.item} to={{ pathname: `/cities/${city.id}/objects/${object.id}`, search: search ? `?${search}` : '' }}>
+                <Link className={styles.item} to={{ pathname: `${base}/objects/${object.id}`, search: search ? `?${search}` : '' }}>
                   <strong>{object.name}</strong>
                   <span className={controls.muted}>{category?.name ?? object.categoryId}</span>
                 </Link>

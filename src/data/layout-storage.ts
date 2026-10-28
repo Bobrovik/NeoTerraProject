@@ -1,6 +1,6 @@
 import type { LinkLimit, ObjectResourceRole } from '../domain/balance'
-import type { CityDraft } from '../domain/layout'
-import type { CatalogSnapshot, City, DevelopmentStatus, ReliabilityStatus } from '../domain/types'
+import { validateCityDraft, type CityDraft } from '../domain/layout'
+import type { CatalogSnapshot, City, DevelopmentStatus, ReliabilityStatus, Road } from '../domain/types'
 import { collectStoredLayoutIssues, type StoredLayouts } from '../domain/user-city'
 
 export const layoutStorageKey = 'future-city.layouts.v1'
@@ -144,4 +144,218 @@ function isReliability(value: unknown): value is City['reliability'] {
   const status = (value as { status?: unknown }).status
   const known: ReliabilityStatus[] = ['verified', 'engineering-fact', 'fresco-principle', 'hypothesis', 'demo']
   return typeof status === 'string' && known.includes(status as ReliabilityStatus)
+}
+
+export const cityProjectFormat = 'future-city-project'
+
+export type CityProject = {
+  city: City
+  draft: CityDraft
+}
+
+export function serializeCityProject(city: City, draft: CityDraft): string {
+  return JSON.stringify({ format: cityProjectFormat, version: 1, city, draft }, null, 2)
+}
+
+export function parseCityProject(raw: string, snapshot: CatalogSnapshot): { ok: true; project: CityProject } | { ok: false; message: string } {
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(raw)
+  } catch {
+    return { ok: false, message: 'The city file is not valid JSON.' }
+  }
+  if (!parsed || typeof parsed !== 'object') {
+    return { ok: false, message: 'This is not a city project file.' }
+  }
+  const record = parsed as { format?: unknown; version?: unknown; city?: unknown; draft?: unknown }
+  if (record.format !== cityProjectFormat) {
+    return { ok: false, message: 'This is not a city project file.' }
+  }
+  if (record.version !== 1) {
+    return { ok: false, message: 'This city file uses a version this application cannot read.' }
+  }
+  if (!isCity(record.city) || !isDraft(record.draft)) {
+    return { ok: false, message: 'The city file is missing the city or its layout.' }
+  }
+  if (record.draft.cityId !== record.city.id) {
+    return { ok: false, message: 'The city file does not match its layout.' }
+  }
+  const issues = validateCityDraft(record.draft, snapshot)
+  if (issues.length > 0) {
+    return { ok: false, message: issues[0] ?? 'The city file failed validation.' }
+  }
+  return { ok: true, project: { city: record.city, draft: record.draft } }
+}
+
+export function mergeCityProject(
+  stored: StoredLayouts,
+  project: CityProject,
+  snapshot: CatalogSnapshot,
+): { ok: true; stored: StoredLayouts } | { ok: false; message: string } {
+  if (snapshot.cities.some((city) => city.id === project.city.id)) {
+    return { ok: false, message: `City ${project.city.id} is a demonstration city and was not imported.` }
+  }
+  const cities = stored.cities.some((city) => city.id === project.city.id)
+    ? stored.cities.map((city) => (city.id === project.city.id ? project.city : city))
+    : [...stored.cities, project.city]
+  const next: StoredLayouts = {
+    cities,
+    drafts: [...stored.drafts.filter((draft) => draft.cityId !== project.city.id), project.draft],
+  }
+  const issues = collectStoredLayoutIssues(next, snapshot)
+  if (issues.length > 0) {
+    return { ok: false, message: issues[0] ?? 'The city file failed validation.' }
+  }
+  return { ok: true, stored: next }
+}
+
+export type CityImportChoice = 'copy' | 'replace'
+
+export type CityImportCommit =
+  | { ok: true; cityId: string; stored: StoredLayouts }
+  | { ok: false; message: string; needsChoice?: false }
+  | { ok: false; needsChoice: true; cityId: string; message: string }
+
+export function commitCityImport(
+  stored: StoredLayouts,
+  project: CityProject,
+  snapshot: CatalogSnapshot,
+  choice?: CityImportChoice,
+): CityImportCommit {
+  const demo = snapshot.cities.some((city) => city.id === project.city.id)
+  const saved = stored.cities.some((city) => city.id === project.city.id)
+  if (demo || (saved && choice === 'copy')) {
+    const copy = copyCityProject(project, takenCityIds(stored, snapshot), takenRecordIds(stored, snapshot))
+    const merged = mergeCityProject(stored, copy, snapshot)
+    return merged.ok ? { ok: true, cityId: copy.city.id, stored: merged.stored } : merged
+  }
+  if (saved && choice !== 'replace') {
+    return {
+      ok: false,
+      needsChoice: true,
+      cityId: project.city.id,
+      message: `City ${project.city.id} is already saved in this browser. Replace that city, or import a copy with a new id.`,
+    }
+  }
+  const merged = mergeCityProject(stored, project, snapshot)
+  return merged.ok ? { ok: true, cityId: project.city.id, stored: merged.stored } : merged
+}
+
+function takenCityIds(stored: StoredLayouts, snapshot: CatalogSnapshot): Set<string> {
+  return new Set([...snapshot.cities.map((city) => city.id), ...stored.cities.map((city) => city.id)])
+}
+
+function takenRecordIds(stored: StoredLayouts, snapshot: CatalogSnapshot): Set<string> {
+  const used = new Set<string>()
+  for (const object of snapshot.objects) used.add(object.id)
+  for (const system of snapshot.systems) used.add(system.id)
+  for (const flow of snapshot.flows) used.add(flow.id)
+  for (const road of snapshot.roads) used.add(road.id)
+  for (const draft of stored.drafts) rememberDraftIds(draft, used)
+  return used
+}
+
+function rememberDraftIds(draft: CityDraft, used: Set<string>): void {
+  for (const object of draft.objects) used.add(object.id)
+  for (const system of draft.systems) used.add(system.id)
+  for (const flow of draft.flows) used.add(flow.id)
+  for (const road of draft.roads) used.add(road.id)
+  if (draft.energyExampleBackup) rememberDraftIds(draft.energyExampleBackup, used)
+}
+
+function copyCityProject(project: CityProject, cityIds: Set<string>, recordIds: Set<string>): CityProject {
+  const id = availableCityId(project.city.id, cityIds)
+  const slug = id.slice('city:'.length)
+  const ids = new Map<string, string>()
+  assignRecordIds(project.draft, slug, recordIds, ids)
+  const name = project.city.name.endsWith(' (imported)') ? project.city.name : `${project.city.name} (imported)`
+  return {
+    city: { ...project.city, id, name },
+    draft: remapDraft(project.draft, id, ids),
+  }
+}
+
+function availableCityId(sourceId: string, taken: Set<string>): string {
+  const stem = sourceId.startsWith('city:') ? sourceId.slice('city:'.length) : sourceId
+  const base = `city:${stem}-imported`
+  if (!taken.has(base)) {
+    return base
+  }
+  let suffix = 2
+  while (taken.has(`city:${stem}-imported-${suffix}`)) {
+    suffix += 1
+  }
+  return `city:${stem}-imported-${suffix}`
+}
+
+function assignRecordIds(draft: CityDraft, slug: string, used: Set<string>, ids: Map<string, string>): void {
+  const claim = (previous: string, prefix: string) => {
+    if (ids.has(previous)) {
+      return
+    }
+    const tail = previous.split(':').slice(2).join(':')
+    const body = tail.length > 0 ? tail : 'item'
+    let candidate = `${prefix}:${slug}:${body}`
+    let suffix = 2
+    while (used.has(candidate)) {
+      candidate = `${prefix}:${slug}:${body}-${suffix}`
+      suffix += 1
+    }
+    used.add(candidate)
+    ids.set(previous, candidate)
+  }
+  for (const object of draft.objects) claim(object.id, 'object')
+  for (const system of draft.systems) claim(system.id, 'system')
+  for (const flow of draft.flows) claim(flow.id, 'flow')
+  for (const road of draft.roads) claim(road.id, 'road')
+  if (draft.energyExampleBackup) assignRecordIds(draft.energyExampleBackup, slug, used, ids)
+}
+
+function remapDraft(draft: CityDraft, cityId: string, ids: Map<string, string>): CityDraft {
+  const next: CityDraft = {
+    ...draft,
+    cityId,
+    objects: draft.objects.map((object) => ({
+      ...object,
+      id: ids.get(object.id) ?? object.id,
+      cityId,
+      systemIds: object.systemIds.map((systemId) => ids.get(systemId) ?? systemId),
+    })),
+    systems: draft.systems.map((system) => ({
+      ...system,
+      id: ids.get(system.id) ?? system.id,
+      cityId,
+      memberObjectIds: system.memberObjectIds.map((objectId) => ids.get(objectId) ?? objectId),
+    })),
+    flows: draft.flows.map((flow) => ({
+      ...flow,
+      id: ids.get(flow.id) ?? flow.id,
+      systemId: ids.get(flow.systemId) ?? flow.systemId,
+      sourceObjectId: ids.get(flow.sourceObjectId) ?? flow.sourceObjectId,
+      targetObjectId: ids.get(flow.targetObjectId) ?? flow.targetObjectId,
+    })),
+    roads: draft.roads.map((road) => ({
+      ...road,
+      id: ids.get(road.id) ?? road.id,
+      cityId,
+      points: road.points.map((point) => remapRoadPoint(point, ids)),
+    })),
+  }
+  if (draft.resourceRoles) {
+    next.resourceRoles = draft.resourceRoles.map((role) => ({ ...role, objectId: ids.get(role.objectId) ?? role.objectId }))
+  }
+  if (draft.linkLimits) {
+    next.linkLimits = draft.linkLimits.map((limit) => ({ ...limit, flowId: ids.get(limit.flowId) ?? limit.flowId }))
+  }
+  if (draft.energyExampleBackup) {
+    next.energyExampleBackup = remapDraft(draft.energyExampleBackup, cityId, ids)
+  }
+  return next
+}
+
+function remapRoadPoint(point: Road['points'][number], ids: Map<string, string>): Road['points'][number] {
+  if (point.kind === 'object') {
+    return { ...point, objectId: ids.get(point.objectId) ?? point.objectId }
+  }
+  return point
 }

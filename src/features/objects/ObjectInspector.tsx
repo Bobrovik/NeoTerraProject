@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
-import { Link, useParams, useSearchParams } from 'react-router'
+import { Link, useLocation, useParams, useSearchParams } from 'react-router'
 import { useReadyCatalog } from '../../data/useCatalog'
+import type { LinkLimit, ObjectResourceRole } from '../../domain/balance'
 import { LOCAL_FRAME_RADIUS_METERS, localHorizontalDistance, localToGeodetic } from '../../domain/geo'
 import { createConnection, deleteConnection, updateObjectDetails } from '../../domain/layout'
 import { EnergyRatesForm } from './EnergyRatesForm'
@@ -19,11 +20,14 @@ import {
 import { ReliabilityBadge } from '../../shared/ui/ReliabilityBadge'
 import { EmptyState } from '../../shared/ui/Status'
 import controls from '../../shared/ui/controls.module.css'
+import { cityBasePath, isCityEditorPath } from '../city/city-view'
 import styles from './Inspector.module.css'
 
 export function ObjectInspector() {
   const { snapshot, tasks, drafts, editCity } = useReadyCatalog()
   const { cityId, objectId } = useParams()
+  const location = useLocation()
+  const editing = isCityEditorPath(location.pathname)
   const [searchParams] = useSearchParams()
   const [targetId, setTargetId] = useState('')
   const [resourceId, setResourceId] = useState(snapshot.resourceTypes[0]?.id ?? '')
@@ -43,10 +47,13 @@ export function ObjectInspector() {
   const documents = uniqueDocuments(snapshot, object.id, object.documentIds)
   const relatedTasks = tasksForObject(tasks, object.id)
   const search = searchParams.toString()
+  const base = cityBasePath(editing, city.id)
+  const cityDraft = drafts.find((draft) => draft.cityId === city.id)
+  const electricityFlows = flows.filter((flow) => flow.resourceTypeId === 'resource:electricity')
 
   return (
     <div className={styles.block}>
-      <Link className={controls.ghost} to={{ pathname: `/cities/${city.id}`, search: search ? `?${search}` : '' }}>
+      <Link className={controls.ghost} to={{ pathname: base, search: search ? `?${search}` : '' }}>
         Back to city
       </Link>
       <div className={controls.row}>
@@ -61,16 +68,26 @@ export function ObjectInspector() {
       <p>{object.description}</p>
       <p className={controls.muted}>{object.id}</p>
       <LocalPosition cityLatitude={city.latitude} cityLongitude={city.longitude} x={object.placement.position.x} y={object.placement.position.y} z={object.placement.position.z} />
-      <PropertyForm object={object} cityId={city.id} editCity={editCity} />
-      <EnergyRatesForm
-        cityId={city.id}
-        objectId={object.id}
-        facilityType={object.facilityType}
-        flows={flows.filter((flow) => flow.resourceTypeId === 'resource:electricity')}
-        role={drafts.find((draft) => draft.cityId === city.id)?.resourceRoles?.find((role) => role.objectId === object.id && role.resourceTypeId === 'resource:electricity')}
-        limits={drafts.find((draft) => draft.cityId === city.id)?.linkLimits}
-        editCity={editCity}
-      />
+      {editing ? (
+        <>
+          <PropertyForm object={object} cityId={city.id} editCity={editCity} />
+          <EnergyRatesForm
+            cityId={city.id}
+            objectId={object.id}
+            facilityType={object.facilityType}
+            flows={electricityFlows}
+            role={cityDraft?.resourceRoles?.find((role) => role.objectId === object.id && role.resourceTypeId === 'resource:electricity')}
+            limits={cityDraft?.linkLimits}
+            editCity={editCity}
+          />
+        </>
+      ) : (
+        <ElectricityReadout
+          role={cityDraft?.resourceRoles?.find((role) => role.objectId === object.id && role.resourceTypeId === 'resource:electricity')}
+          flows={electricityFlows}
+          limits={cityDraft?.linkLimits}
+        />
+      )}
       {object.reliability.note ? <p className={controls.muted}>{object.reliability.note}</p> : null}
       {object.metrics.length > 0 ? (
         <section className={styles.block}>
@@ -92,7 +109,7 @@ export function ObjectInspector() {
             const system = getSystem(snapshot, systemId)
             return (
               <li key={systemId}>
-                <Link className={styles.item} to={`/cities/${city.id}/systems/${systemId}`}>
+                <Link className={styles.item} to={`${base}/systems/${systemId}`}>
                   <strong>{system?.name ?? systemId}</strong>
                   <span className={controls.muted}>{system?.kind}</span>
                 </Link>
@@ -113,11 +130,11 @@ export function ObjectInspector() {
             const otherId = flow.sourceObjectId === object.id ? flow.targetObjectId : flow.sourceObjectId
             return (
               <li key={flow.id} className={styles.item}>
-                <Link to={{ pathname: `/cities/${city.id}/objects/${otherId}`, search: search ? `?${search}` : '' }}>
+                <Link to={{ pathname: `${base}/objects/${otherId}`, search: search ? `?${search}` : '' }}>
                   <strong>{source?.name ?? flow.sourceObjectId} → {target?.name ?? flow.targetObjectId}</strong>
                 </Link>
                 <span className={controls.muted}>{resource?.name ?? flow.resourceTypeId} · {resource?.flowKind}</span>
-                {systemsMode ? (
+                {editing && systemsMode ? (
                   <button type="button" className={controls.ghost} onClick={() => setLinkMessage(editCity(city.id, (draft) => deleteConnection(draft, flow.id)))}>
                     Delete link
                   </button>
@@ -126,7 +143,7 @@ export function ObjectInspector() {
             )
           })}
         </ul>
-        {systemsMode ? (
+        {editing && systemsMode ? (
           <form
             className={controls.stack}
             onSubmit={(event) => {
@@ -194,6 +211,39 @@ export function ObjectInspector() {
         </ul>
       </section>
     </div>
+  )
+}
+
+function ElectricityReadout({
+  role,
+  flows,
+  limits,
+}: {
+  role: ObjectResourceRole | undefined
+  flows: ReturnType<typeof flowsForObject>
+  limits: LinkLimit[] | undefined
+}) {
+  return (
+    <section className={styles.block}>
+      <h3>Electricity</h3>
+      {role ? (
+        <p>
+          Production {role.produces} kWh/day. Demand {role.consumes} kWh/day. Storage {role.stores} kWh. Stored now {role.stock} kWh. Priority {role.priority}.
+        </p>
+      ) : (
+        <p>Power supply parameters not set for this object.</p>
+      )}
+      {flows.map((flow) => {
+        const limit = limits?.find((item) => item.flowId === flow.id)
+        return (
+          <p key={flow.id} className={controls.muted}>
+            {limit
+              ? `Line capacity ${limit.capacity} kWh/day. Losses ${Math.round(limit.loss * 100)}%. ${limit.inService ? 'Enabled' : 'Disabled'}.`
+              : 'Line limits not set.'}
+          </p>
+        )
+      })}
+    </section>
   )
 }
 

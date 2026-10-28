@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useLocation } from 'react-router'
 import { useReadyCatalog } from '../../data/useCatalog'
 import type { EnergyBalance, LinkBalance, ObjectBalance, ObjectConstraint } from '../../domain/balance'
 import { buildingTemplates } from '../../domain/buildings'
@@ -7,12 +8,14 @@ import { applySampleEnergyRates, loadEnergyExample, revertEnergyExample } from '
 import { getObject, objectsForCity } from '../../domain/queries'
 import type { ResourceFlow } from '../../domain/types'
 import controls from '../../shared/ui/controls.module.css'
+import { isCityEditorPath } from '../city/city-view'
 import styles from '../objects/Inspector.module.css'
 import schematic from './EnergyBalancePanel.module.css'
 
 const electricityId = 'resource:electricity'
 
 export function EnergyBalancePanel({ cityId }: { cityId: string }) {
+  const editing = isCityEditorPath(useLocation().pathname)
   const { snapshot, drafts, userCityIds, editCity } = useReadyCatalog()
   const [exampleMessage, setExampleMessage] = useState<string | undefined>()
   const [confirmSample, setConfirmSample] = useState(false)
@@ -27,7 +30,7 @@ export function EnergyBalancePanel({ cityId }: { cityId: string }) {
   return (
     <section className={styles.block}>
       <h3>Energy balance</h3>
-      {userCityIds.includes(cityId) ? (
+      {editing && userCityIds.includes(cityId) ? (
         <div className={controls.stack}>
           <button
             type="button"

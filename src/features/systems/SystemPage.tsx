@@ -1,16 +1,19 @@
-import { Link, useNavigate, useParams } from 'react-router'
+import { Link, useLocation, useNavigate, useParams } from 'react-router'
 import { useReadyCatalog } from '../../data/useCatalog'
 import { documentsForEntity, getCity, getSystem, tasksForSystem } from '../../domain/queries'
 import { buildSystemGraph, systemGraphNodeSize } from '../../domain/system-graph'
 import { EnergyBalancePanel } from './EnergyBalancePanel'
 import { ReliabilityBadge } from '../../shared/ui/ReliabilityBadge'
 import { EmptyState } from '../../shared/ui/Status'
+import { cityBasePath, isCityEditorPath } from '../city/city-view'
 import controls from '../../shared/ui/controls.module.css'
 import styles from './SystemPage.module.css'
 
 export function SystemPage() {
   const { snapshot, tasks } = useReadyCatalog()
   const navigate = useNavigate()
+  const location = useLocation()
+  const editing = isCityEditorPath(location.pathname)
   const { cityId, systemId } = useParams()
   const city = cityId ? getCity(snapshot, cityId) : undefined
   const system = systemId ? getSystem(snapshot, systemId) : undefined
@@ -26,7 +29,7 @@ export function SystemPage() {
   return (
     <div className={styles.page}>
       <div className={controls.row}>
-        <Link className={controls.ghost} to={`/cities/${city.id}`}>Back to {city.name}</Link>
+        <Link className={controls.ghost} to={cityBasePath(editing, city.id)}>Back to {city.name}</Link>
       </div>
       <header className={styles.lead}>
         <div className={controls.row}>
@@ -54,10 +57,10 @@ export function SystemPage() {
                 role="link"
                 tabIndex={0}
                 style={{ cursor: 'pointer' }}
-                onClick={() => navigate(`/cities/${city.id}/objects/${node.objectId}?view=flows`)}
+                onClick={() => navigate(`${cityBasePath(editing, city.id)}/objects/${node.objectId}?view=systems`)}
                 onKeyDown={(event) => {
                   if (event.key === 'Enter') {
-                    navigate(`/cities/${city.id}/objects/${node.objectId}?view=flows`)
+                    navigate(`${cityBasePath(editing, city.id)}/objects/${node.objectId}?view=systems`)
                   }
                 }}
               >
