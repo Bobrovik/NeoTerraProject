@@ -1,0 +1,12 @@
+---
+description: Apply NeoTerraProject documentation and git skills on every task
+alwaysApply: true
+---
+
+# Project agent
+
+Before a task, read `AGENTS.md` and follow `.cursor/skills/project-documentation/SKILL.md`.
+
+Before editing, and again when a logical change is ready to save, follow `.cursor/skills/git-workflow/SKILL.md`.
+
+Do not commit files that are outside the current task. Do not force-push. Do not merge into `main` without an explicit request.
