@@ -3,6 +3,7 @@ import { lazy, Suspense, type ReactNode } from 'react'
 import { createBrowserRouter, type RouteObject } from 'react-router'
 import type { CityIntent } from '../features/city/city-view'
 import { AboutPage } from '../features/about/AboutPage'
+import { CatalogPage } from '../features/catalog/CatalogPage'
 import { DocumentListPage } from '../features/documents/DocumentListPage'
 import { DocumentPage } from '../features/documents/DocumentPage'
 import { HomePage } from '../features/home/HomePage'
@@ -42,6 +43,7 @@ export const router = createBrowserRouter([
     children: [
       { index: true, element: <HomePage /> },
       { path: 'planet', element: <LazyView><PlanetPage /></LazyView> },
+      { path: 'catalog', element: <CatalogPage /> },
       { path: 'cities/:cityId', children: cityRoutes('view') },
       {
         path: 'editor',

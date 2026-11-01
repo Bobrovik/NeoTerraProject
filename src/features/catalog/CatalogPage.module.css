@@ -1,0 +1,39 @@
+.page { display: flex; flex-direction: column; gap: 16px; max-width: 960px; }
+
+.heading { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; }
+
+.create:disabled { opacity: 0.55; cursor: not-allowed; }
+
+.counts { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 8px; }
+
+.count { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); }
+
+.tabs, .filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: end; }
+
+.filters label { min-width: 150px; }
+
+.filters label:first-child { flex: 1; min-width: 220px; }
+
+.list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--bg-raised);
+}
+
+.meta { display: flex; flex-wrap: wrap; gap: 8px 14px; color: var(--muted); font-size: 0.92rem; }
+
+.kind { display: inline-flex; align-items: center; gap: 6px; color: var(--text); }
+
+.swatch { width: 0.7rem; height: 0.7rem; border-radius: 2px; flex: none; }
+
+.resource { background: #3c9a62; }
+
+.source { background: #4c88d8; }
+
+.consumer { background: #e0923a; }

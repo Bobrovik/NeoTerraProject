@@ -37,6 +37,8 @@ export function Breadcrumbs() {
     if (system) {
       crumbs.push({ label: system.name })
     }
+  } else if (location.pathname.startsWith('/catalog')) {
+    crumbs.push({ label: 'Home', to: '/' }, { label: 'Catalog' })
   } else if (location.pathname.startsWith('/documents')) {
     crumbs.push({ label: 'Documents', to: '/documents' })
     if (document) {

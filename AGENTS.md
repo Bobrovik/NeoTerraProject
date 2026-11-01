@@ -15,7 +15,7 @@ Layers:
 - `src/shared` — controls, status, search, breadcrumbs.
 - `src/app` — shell, router, config.
 
-The in-memory catalog (`CatalogSnapshot`) is cities, object categories, city objects, resource types, systems, flows, roads, documents, and tasks. The resource/source/consumer card catalog is a separate domain model in `src/domain/resource-catalog.ts`. Its browser adapter is `src/data/resource-catalog-storage.ts`. There is no catalog page yet.
+The in-memory catalog (`CatalogSnapshot`) is cities, object categories, city objects, resource types, systems, flows, roads, documents, and tasks. The resource/source/consumer card catalog is a separate domain model in `src/domain/resource-catalog.ts`. Its browser adapter is `src/data/resource-catalog-storage.ts`. List filtering and sorting live in `src/domain/resource-catalog-view.ts`. The page is `src/features/catalog/CatalogPage.tsx`.
 
 ## Routing
 
@@ -23,6 +23,7 @@ Router: `src/app/router.tsx`. Shell: `src/app/AppShell.tsx`.
 
 - `/` Home
 - `/planet` Planet
+- `/catalog` resource, source, and consumer cards
 - `/cities/:cityId` city viewer, plus `objects/:objectId`
 - `/cities/:cityId/systems/:systemId`
 - `/editor` and `/editor/:cityId` city editor, plus object routes
@@ -70,13 +71,13 @@ Missing values stay absent. Do not store a missing number as zero.
 - Forest and population color countries from national World Bank statistics. They are not forest-stand maps or counts of people inside a shape.
 - Conflicts are UCDP candidate points through the Vite `/ucdp-feed` forward. Country-only precision is not drawn.
 - Minerals are USGS major nonfuel deposits (OFR 2005-1294). Shape and color mark the category. Oil, natural gas, reserves, and mine status are not in that file.
-- Resource catalog types and versioned storage. No catalog route, form, or seeded cards.
+- Resource catalog types, versioned storage, and a `/catalog` list with type counts, search, filters, and sorting. The list does not show measurements or evidence. Create card is present and inactive until the form exists. No seeded cards.
 
 ## Current State
 
 Branch: `feature/building-placement`. Remote: `origin` → `https://github.com/Bobrovik/NeoTerraProject.git`.
 
-The resource catalog domain and storage exist. Navigation has no Catalog item.
+The resource catalog list is in the primary navigation. Card creation and detail views are not built.
 
 The working tree may contain edits outside a catalog commit. Do not fold unrelated files into a catalog commit.
 
@@ -84,6 +85,7 @@ The working tree may contain edits outside a catalog commit. Do not fold unrelat
 
 - Keep city layout storage, planet feed cache, and the resource card catalog in separate versioned keys. The layout parser rejects unknown shapes, so catalog cards do not belong in `future-city.layouts.v1`. A link that cites a missing card is rejected rather than stored.
 - Do not reuse `ResourceType` or `ResourceFlow` as the universal card. Those types are city-flow records. A global card needs its own id and optional links to a city id later.
+- Catalog search, filters, and sorting are pure functions. Kind, text, category, scarcity, priority, and status apply together. Text matches name, summary, category, and subcategory.
 - Absence of a measurement is not zero. Priority is not scarcity. A stock is not a replenishment rate. Power (kW) is not energy (kWh).
 - Do not invent scientific numbers. A demo value must be labeled demo. A link is not verification.
 - Do not rewrite `calculateEnergyBalance`, the editor/viewer split, or city import unless the task requires it.
@@ -98,6 +100,6 @@ The working tree may contain edits outside a catalog commit. Do not fold unrelat
 
 ## Next Steps
 
-Stage 1 is in place: `src/domain/resource-catalog.ts`, `src/domain/resource-catalog.test.ts`, and `src/data/resource-catalog-storage.ts`.
+Stage 2 is in place: `/catalog`, the Catalog nav item, and `src/domain/resource-catalog-view.ts`.
 
-Stage 2, not started: `/catalog` route, navigation item, card list, type marker, search, and filters. Then the form, then link editing in the interface. Do not seed scientific examples.
+Stage 3, not started: the universal card form, measurements, scarcity, priority, evidence, and source or consumer fields. Then link editing in the interface. Do not seed scientific examples.
