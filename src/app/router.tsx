@@ -4,6 +4,7 @@ import { createBrowserRouter, type RouteObject } from 'react-router'
 import type { CityIntent } from '../features/city/city-view'
 import { AboutPage } from '../features/about/AboutPage'
 import { CatalogCardPage } from '../features/catalog/CatalogCardPage'
+import { CatalogNetworkPage } from '../features/catalog/CatalogNetworkPage'
 import { CatalogPage } from '../features/catalog/CatalogPage'
 import { DocumentListPage } from '../features/documents/DocumentListPage'
 import { DocumentPage } from '../features/documents/DocumentPage'
@@ -46,6 +47,7 @@ export const router = createBrowserRouter([
       { path: 'planet', element: <LazyView><PlanetPage /></LazyView> },
       { path: 'catalog', element: <CatalogPage /> },
       { path: 'catalog/new', element: <CatalogCardPage mode="new" /> },
+      { path: 'catalog/network', element: <CatalogNetworkPage /> },
       { path: 'catalog/:cardId', element: <CatalogCardPage mode="existing" /> },
       { path: 'cities/:cityId', children: cityRoutes('view') },
       {

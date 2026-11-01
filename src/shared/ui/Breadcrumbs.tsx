@@ -43,6 +43,8 @@ export function Breadcrumbs() {
     crumbs.push({ label: 'Home', to: '/' }, nested ? { label: 'Catalog', to: '/catalog' } : { label: 'Catalog' })
     if (location.pathname === '/catalog/new') {
       crumbs.push({ label: 'New card' })
+    } else if (location.pathname === '/catalog/network') {
+      crumbs.push({ label: 'Resource network' })
     } else if (cardId) {
       const read = readResourceCatalog(localStorage)
       const card = read.ok ? read.catalog.cards.find((item) => item.id === cardId) : undefined

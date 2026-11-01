@@ -15,7 +15,7 @@ Layers:
 - `src/shared` — controls, status, search, breadcrumbs.
 - `src/app` — shell, router, config.
 
-The in-memory catalog (`CatalogSnapshot`) is cities, object categories, city objects, resource types, systems, flows, roads, documents, and tasks. The resource/source/consumer card catalog is a separate domain model in `src/domain/resource-catalog.ts`. Its browser adapter is `src/data/resource-catalog-storage.ts`. List filtering and sorting live in `src/domain/resource-catalog-view.ts`. The form draft is converted by `src/domain/resource-catalog-form.ts`. Pages: `src/features/catalog/CatalogPage.tsx` and `src/features/catalog/CatalogCardPage.tsx`.
+The in-memory catalog (`CatalogSnapshot`) is cities, object categories, city objects, resource types, systems, flows, roads, documents, and tasks. The resource/source/consumer card catalog is a separate domain model in `src/domain/resource-catalog.ts`. Its browser adapter is `src/data/resource-catalog-storage.ts`. List filtering and sorting live in `src/domain/resource-catalog-view.ts`. The form draft is converted by `src/domain/resource-catalog-form.ts`. Relationship queries, integrity notices, and link add/remove live in `src/domain/resource-network.ts`. Pages: `src/features/catalog/CatalogPage.tsx`, `src/features/catalog/CatalogCardPage.tsx`, and `src/features/catalog/CatalogNetworkPage.tsx`.
 
 ## Routing
 
@@ -24,6 +24,7 @@ Router: `src/app/router.tsx`. Shell: `src/app/AppShell.tsx`.
 - `/` Home
 - `/planet` Planet
 - `/catalog` resource, source, and consumer cards
+- `/catalog/network` graph and list of produces and uses connections
 - `/catalog/new` and `/catalog/:cardId` create, view, and edit one card
 - `/cities/:cityId` city viewer, plus `objects/:objectId`
 - `/cities/:cityId/systems/:systemId`
@@ -72,13 +73,13 @@ Missing values stay absent. Do not store a missing number as zero.
 - Forest and population color countries from national World Bank statistics. They are not forest-stand maps or counts of people inside a shape.
 - Conflicts are UCDP candidate points through the Vite `/ucdp-feed` forward. Country-only precision is not drawn.
 - Minerals are USGS major nonfuel deposits (OFR 2005-1294). Shape and color mark the category. Oil, natural gas, reserves, and mine status are not in that file.
-- Resource catalog types, versioned storage, a `/catalog` list, and a card form. The form saves measurements, accounts, evidence, and source or consumer profiles through the existing catalog file. A source can record the resources it produces, and a consumer can record the resources it uses. No seeded cards.
+- Resource catalog types, versioned storage, a `/catalog` list, a card form, and a `/catalog/network` page. The form and the network page read and write the same catalog file. A source can record the resources it produces, and a consumer can record the resources it uses. The network draws those links and can add or delete them. A link is not a flow, and the page does not calculate a balance. No seeded cards.
 
 ## Current State
 
 Branch: `feature/building-placement`. Remote: `origin` → `https://github.com/Bobrovik/NeoTerraProject.git`.
 
-The resource catalog list and card editor are in the app. A separate relationship screen is not built.
+The resource catalog list, card editor, and relationship network are in the app.
 
 The working tree may contain edits outside a catalog commit. Do not fold unrelated files into a catalog commit.
 
@@ -88,6 +89,7 @@ The working tree may contain edits outside a catalog commit. Do not fold unrelat
 - Do not reuse `ResourceType` or `ResourceFlow` as the universal card. Those types are city-flow records. A global card needs its own id and optional links to a city id later.
 - Catalog search, filters, and sorting are pure functions. Kind, text, category, scarcity, priority, and status apply together. Text matches name, summary, category, and subcategory.
 - The card form keeps an editing draft and writes a catalog card on save. An empty numeric field stays `null` or omitted. Deleting evidence clears measurement references to that id. A URL does not set verification.
+- Produces and uses links stay the catalog link records. The network page adds and deletes those records through the same parser and storage key. Replacing a connection is a delete followed by an add. Missing or wrong-kind links and duplicate endpoint pairs are errors. A card with no connection is a warning, and the page does not delete it. The graph is plain SVG in three columns. Above 18 visible nodes it asks for a focus before drawing.
 - Absence of a measurement is not zero. Priority is not scarcity. A stock is not a replenishment rate. Power (kW) is not energy (kWh).
 - Do not invent scientific numbers. A demo value must be labeled demo. A link is not verification.
 - Do not rewrite `calculateEnergyBalance`, the editor/viewer split, or city import unless the task requires it.
@@ -102,6 +104,6 @@ The working tree may contain edits outside a catalog commit. Do not fold unrelat
 
 ## Next Steps
 
-Stage 3 is in place: `/catalog/new`, `/catalog/:cardId`, and `src/domain/resource-catalog-form.ts`.
+Stage 4 is in place: `/catalog/network`, `src/domain/resource-network.ts`, and `src/features/catalog/CatalogNetworkPage.tsx`.
 
-Next, not started: a relationship view across many cards. Do not seed scientific examples.
+Stop here. Do not start a later catalog stage unless a new task asks for it. Do not seed scientific examples.

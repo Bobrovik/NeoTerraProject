@@ -71,7 +71,10 @@ export function CatalogPage() {
             ))}
           </p>
         </div>
-        <Link className={controls.button} to="/catalog/new">Create card</Link>
+        <div className={styles.actions}>
+          <Link className={controls.ghost} to="/catalog/network">Resource network</Link>
+          <Link className={controls.button} to="/catalog/new">Create card</Link>
+        </div>
       </header>
       <div className={styles.tabs} role="group" aria-label="Card type">
         <button className={controls.toggle} type="button" aria-pressed={query.kind === 'all'} onClick={() => update({ kind: 'all' })}>All</button>

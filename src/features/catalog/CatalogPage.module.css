@@ -2,6 +2,8 @@
 
 .heading { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; }
 
+.actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+
 .counts { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 8px; }
 
 .count { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); }
