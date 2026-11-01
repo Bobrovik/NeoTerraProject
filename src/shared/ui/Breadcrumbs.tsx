@@ -1,12 +1,13 @@
 import { Link, useLocation, useParams } from 'react-router'
 import { isCityEditorPath } from '../../features/city/city-view'
 import { getCity, getDocument, getObject, getSystem } from '../../domain/queries'
+import { readResourceCatalog } from '../../data/resource-catalog-storage'
 import { useReadyCatalog } from '../../data/useCatalog'
 import styles from './Breadcrumbs.module.css'
 
 export function Breadcrumbs() {
   const { snapshot } = useReadyCatalog()
-  const { cityId, objectId, systemId, documentId } = useParams()
+  const { cityId, objectId, systemId, documentId, cardId } = useParams()
   const location = useLocation()
   const city = cityId ? getCity(snapshot, cityId) : undefined
   const object = objectId ? getObject(snapshot, objectId) : undefined
@@ -38,7 +39,15 @@ export function Breadcrumbs() {
       crumbs.push({ label: system.name })
     }
   } else if (location.pathname.startsWith('/catalog')) {
-    crumbs.push({ label: 'Home', to: '/' }, { label: 'Catalog' })
+    const nested = location.pathname !== '/catalog'
+    crumbs.push({ label: 'Home', to: '/' }, nested ? { label: 'Catalog', to: '/catalog' } : { label: 'Catalog' })
+    if (location.pathname === '/catalog/new') {
+      crumbs.push({ label: 'New card' })
+    } else if (cardId) {
+      const read = readResourceCatalog(localStorage)
+      const card = read.ok ? read.catalog.cards.find((item) => item.id === cardId) : undefined
+      crumbs.push({ label: card?.name.trim() || 'Card' })
+    }
   } else if (location.pathname.startsWith('/documents')) {
     crumbs.push({ label: 'Documents', to: '/documents' })
     if (document) {

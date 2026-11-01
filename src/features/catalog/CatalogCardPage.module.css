@@ -1,0 +1,33 @@
+.page { display: flex; flex-direction: column; gap: 16px; max-width: 960px; }
+
+.heading, .actions, .choice { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; }
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--bg-raised);
+}
+
+.grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+
+.wide { grid-column: 1 / -1; }
+
+.entry {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.choice { justify-content: flex-start; }
+
+.detail { display: flex; flex-direction: column; gap: 6px; }
+
+.links { display: flex; flex-direction: column; gap: 6px; }

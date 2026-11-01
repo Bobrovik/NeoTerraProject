@@ -1,4 +1,4 @@
-import type { CardStatus, CatalogCard, CatalogCardKind, Priority, Scarcity } from './resource-catalog'
+import type { CardStatus, CatalogCard, CatalogCardKind, EvidenceStudyType, EvidenceVerification, Priority, QuantityKind, Scarcity } from './resource-catalog'
 
 export type CatalogKindFilter = 'all' | CatalogCardKind
 
@@ -40,6 +40,34 @@ export const cardStatusLabels: Record<CardStatus, string> = {
   draft: 'Draft',
   verified: 'Verified',
   archived: 'Archived',
+}
+
+export const quantityKindLabels: Record<QuantityKind, string> = {
+  mass: 'Mass',
+  volume: 'Volume',
+  density: 'Density',
+  power: 'Power',
+  energy: 'Energy',
+  productionRate: 'Production rate',
+  consumptionRate: 'Consumption rate',
+  reserve: 'Reserve',
+  area: 'Area',
+  count: 'Count',
+  efficiency: 'Efficiency',
+}
+
+export const evidenceStudyLabels: Record<EvidenceStudyType, string> = {
+  paper: 'Scientific paper',
+  'government-statistics': 'Government statistics',
+  study: 'Research study',
+  'technical-documentation': 'Technical documentation',
+  other: 'Other',
+}
+
+export const evidenceVerificationLabels: Record<EvidenceVerification, string> = {
+  unreviewed: 'Unreviewed',
+  preliminary: 'Preliminary',
+  verified: 'Verified',
 }
 
 const priorityRank: Record<Priority, number> = { P1: 0, P2: 1, P3: 2, P4: 3 }

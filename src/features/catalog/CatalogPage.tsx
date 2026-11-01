@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router'
 import { readResourceCatalog } from '../../data/resource-catalog-storage'
 import type { CardStatus, CatalogCardKind, Priority, Scarcity } from '../../domain/resource-catalog'
 import {
@@ -70,7 +71,7 @@ export function CatalogPage() {
             ))}
           </p>
         </div>
-        <button className={`${controls.button} ${styles.create}`} type="button" disabled>Create card</button>
+        <Link className={controls.button} to="/catalog/new">Create card</Link>
       </header>
       <div className={styles.tabs} role="group" aria-label="Card type">
         <button className={controls.toggle} type="button" aria-pressed={query.kind === 'all'} onClick={() => update({ kind: 'all' })}>All</button>
@@ -132,8 +133,9 @@ export function CatalogPage() {
       {cards.length > 0 ? (
         <ul className={styles.list}>
           {cards.map((card) => (
-            <li key={card.id} className={styles.card}>
-              <strong>{card.name}</strong>
+            <li key={card.id}>
+              <Link className={styles.card} to={`/catalog/${card.id}`}>
+              <strong>{card.name.trim() || 'Untitled'}</strong>
               <div className={styles.meta}>
                 <KindMark kind={card.kind} />
                 <span>{card.category || 'No category'}</span>
@@ -142,6 +144,7 @@ export function CatalogPage() {
                 <span>{cardStatusLabels[card.status]}</span>
               </div>
               {card.summary ? <p>{card.summary}</p> : null}
+              </Link>
             </li>
           ))}
         </ul>
