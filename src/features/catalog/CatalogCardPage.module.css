@@ -31,3 +31,25 @@
 .detail { display: flex; flex-direction: column; gap: 6px; }
 
 .links { display: flex; flex-direction: column; gap: 6px; }
+
+.measure {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg-sunken);
+}
+
+.measureHead { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: flex-start; justify-content: space-between; }
+
+.measure p { margin: 2px 0 0; }
+
+.extra { display: flex; flex-direction: column; gap: 12px; }
+
+.extra summary { cursor: pointer; color: var(--muted); }
+
+@media (max-width: 720px) {
+  .grid { grid-template-columns: 1fr; }
+}

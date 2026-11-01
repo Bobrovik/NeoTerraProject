@@ -154,25 +154,10 @@ function CardForm({ draft, catalog, onChange }: { draft: CardDraft; catalog: Res
       <section className={styles.section}>
         <h2>Basic information</h2>
         <div className={styles.grid}>
-          <label className={controls.stack}>Name<input className={controls.field} value={draft.name} onChange={(event) => patch({ name: event.target.value })} /></label>
-          <label className={controls.stack}>
-            Card type
-            <select className={controls.select} value={draft.kind} onChange={(event) => patch({ kind: event.target.value as CatalogCardKind })}>
-              {kinds.map((kind) => <option key={kind} value={kind}>{catalogKindLabels[kind]}</option>)}
-            </select>
-          </label>
+          <label className={`${controls.stack} ${styles.wide}`}>Name<input className={controls.field} value={draft.name} onChange={(event) => patch({ name: event.target.value })} /></label>
           <label className={controls.stack}>Category<input className={controls.field} value={draft.category} onChange={(event) => patch({ category: event.target.value })} /></label>
           <label className={controls.stack}>Subcategory<input className={controls.field} value={draft.subcategory} onChange={(event) => patch({ subcategory: event.target.value })} /></label>
           <label className={`${controls.stack} ${styles.wide}`}>Brief description<textarea className={controls.area} value={draft.summary} onChange={(event) => patch({ summary: event.target.value })} /></label>
-          <label className={controls.stack}>
-            Image kind
-            <select className={controls.select} value={draft.imageKind} onChange={(event) => patch({ imageKind: event.target.value as CardDraft['imageKind'] })}>
-              <option value="icon">Icon</option>
-              <option value="photo">Photograph</option>
-              <option value="diagram">Diagram</option>
-            </select>
-          </label>
-          <label className={controls.stack}>Image address<input className={controls.field} value={draft.imageUrl} onChange={(event) => patch({ imageUrl: event.target.value })} /></label>
           <label className={controls.stack}>
             Status
             <select className={controls.select} value={draft.status} onChange={(event) => patch({ status: event.target.value as CardDraft['status'] })}>
@@ -191,10 +176,44 @@ function CardForm({ draft, catalog, onChange }: { draft: CardDraft; catalog: Res
               {Object.entries(scarcityLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
             </select>
           </label>
-          <label className={controls.stack}>City id<input className={controls.field} value={draft.cityId} onChange={(event) => patch({ cityId: event.target.value })} /></label>
-          <label className={controls.stack}>Region id<input className={controls.field} value={draft.regionId} onChange={(event) => patch({ regionId: event.target.value })} /></label>
-          <label className={controls.stack}>Region label<input className={controls.field} value={draft.regionLabel} onChange={(event) => patch({ regionLabel: event.target.value })} /></label>
+          <label className={controls.stack}>
+            Card type
+            <select className={controls.select} value={draft.kind} onChange={(event) => patch({ kind: event.target.value as CatalogCardKind })}>
+              {kinds.map((kind) => <option key={kind} value={kind}>{catalogKindLabels[kind]}</option>)}
+            </select>
+          </label>
         </div>
+        <details className={styles.extra}>
+          <summary>Location and image</summary>
+          <div className={styles.grid}>
+            <label className={controls.stack}>
+              Image kind
+              <select className={controls.select} value={draft.imageKind} onChange={(event) => patch({ imageKind: event.target.value as CardDraft['imageKind'] })}>
+                <option value="icon">Icon</option>
+                <option value="photo">Photograph</option>
+                <option value="diagram">Diagram</option>
+              </select>
+            </label>
+            <label className={controls.stack}>Image address<input className={controls.field} value={draft.imageUrl} onChange={(event) => patch({ imageUrl: event.target.value })} /></label>
+            <label className={controls.stack}>City id<input className={controls.field} value={draft.cityId} onChange={(event) => patch({ cityId: event.target.value })} /></label>
+            <label className={controls.stack}>Region id<input className={controls.field} value={draft.regionId} onChange={(event) => patch({ regionId: event.target.value })} /></label>
+            <label className={controls.stack}>Region label<input className={controls.field} value={draft.regionLabel} onChange={(event) => patch({ regionLabel: event.target.value })} /></label>
+          </div>
+        </details>
+      </section>
+
+      <section className={styles.section}>
+        <h2>Evidence</h2>
+        <p className={controls.muted}>Add a study once, then choose it as the data source on any measurement. A URL does not make a study verified. Verification is recorded separately. A card can be saved with no studies.</p>
+        {draft.evidence.map((item, index) => (
+          <EvidenceEditor
+            key={item.id}
+            evidence={item}
+            onChange={(next) => patch({ evidence: draft.evidence.map((row, rowIndex) => rowIndex === index ? next : row) })}
+            onRemove={() => onChange(removeEvidenceDraft(draft, item.id))}
+          />
+        ))}
+        <button className={controls.ghost} type="button" onClick={() => patch({ evidence: [...draft.evidence, blankEvidence()] })}>Add study</button>
       </section>
 
       <section className={styles.section}>
@@ -231,20 +250,6 @@ function CardForm({ draft, catalog, onChange }: { draft: CardDraft; catalog: Res
           </div>
         ))}
         <button className={controls.ghost} type="button" onClick={() => patch({ regional: [...draft.regional, blankRegion()] })}>Add region</button>
-      </section>
-
-      <section className={styles.section}>
-        <h2>Evidence</h2>
-        <p className={controls.muted}>A URL does not make a study verified. Verification is recorded separately. A draft can be saved with no studies.</p>
-        {draft.evidence.map((item, index) => (
-          <EvidenceEditor
-            key={item.id}
-            evidence={item}
-            onChange={(next) => patch({ evidence: draft.evidence.map((row, rowIndex) => rowIndex === index ? next : row) })}
-            onRemove={() => onChange(removeEvidenceDraft(draft, item.id))}
-          />
-        ))}
-        <button className={controls.ghost} type="button" onClick={() => patch({ evidence: [...draft.evidence, blankEvidence()] })}>Add evidence</button>
       </section>
 
       {draft.kind === 'source' ? (
@@ -295,61 +300,112 @@ function QuantityEditor({ quantity, evidence, label, onChange, onRemove }: {
   onChange: (quantity: QuantityDraft) => void
   onRemove?: () => void
 }) {
+  const recorded = quantityHasContent(quantity)
+  const [open, setOpen] = useState(Boolean(onRemove) && !recorded)
   const patch = (next: Partial<QuantityDraft>) => onChange({ ...quantity, ...next })
-  return (
-    <div className={styles.entry}>
-      {label ? <h3>{label}</h3> : null}
-      <div className={styles.grid}>
-        <label className={controls.stack}>Name<input className={controls.field} value={quantity.name} onChange={(event) => patch({ name: event.target.value })} /></label>
-        <label className={controls.stack}>Value<input className={controls.field} value={quantity.valueText} onChange={(event) => patch({ valueText: event.target.value })} placeholder="Empty if unknown" /></label>
-        <label className={controls.stack}>Unit<input className={controls.field} value={quantity.unit} onChange={(event) => patch({ unit: event.target.value })} /></label>
-        <label className={controls.stack}>
-          Quantity kind
-          <select className={controls.select} value={quantity.quantityKind} onChange={(event) => patch({ quantityKind: event.target.value as QuantityKind })}>
-            {quantityKinds.map((kind) => <option key={kind} value={kind}>{quantityKindLabels[kind]}</option>)}
-          </select>
-        </label>
-        <label className={controls.stack}>Measured at<input className={controls.field} value={quantity.measuredAt} onChange={(event) => patch({ measuredAt: event.target.value })} /></label>
-        <label className={controls.stack}>Period start<input className={controls.field} value={quantity.periodStart} onChange={(event) => patch({ periodStart: event.target.value })} /></label>
-        <label className={controls.stack}>Period end<input className={controls.field} value={quantity.periodEnd} onChange={(event) => patch({ periodEnd: event.target.value })} /></label>
-        <label className={controls.stack}>
-          Evidence
-          <select className={controls.select} value={quantity.evidenceId} onChange={(event) => patch({ evidenceId: event.target.value })}>
-            <option value="">None</option>
-            {evidence.map((item) => <option key={item.id} value={item.id}>{item.title.trim() || 'Untitled study'}</option>)}
-          </select>
-        </label>
-        <label className={`${controls.stack} ${styles.wide}`}>Conditions<textarea className={controls.area} value={quantity.conditions} onChange={(event) => patch({ conditions: event.target.value })} /></label>
+  const study = quantity.evidenceId ? evidence.find((item) => item.id === quantity.evidenceId) : undefined
+  const sourceName = quantity.evidenceId ? (study?.title.trim() || 'Untitled study') : 'Source not specified'
+  const value = quantity.valueText.trim() === '' ? 'unknown' : quantity.valueText.trim()
+  const title = label || quantity.name.trim() || 'Measurement'
+
+  if (!recorded && !open) {
+    return (
+      <div className={styles.measure}>
+        <div>
+          <strong>{title}</strong>
+          <p className={controls.muted}>No amount recorded.</p>
+        </div>
+        <button className={controls.ghost} type="button" onClick={() => setOpen(true)}>Add</button>
       </div>
-      {onRemove ? <button className={controls.ghost} type="button" onClick={onRemove}>Remove measurement</button> : null}
+    )
+  }
+
+  return (
+    <div className={styles.measure}>
+      <div className={styles.measureHead}>
+        <div>
+          <strong>{title}</strong>
+          <p>{quantity.name.trim() || 'Unnamed'} · {value}{quantity.unit.trim() ? ` ${quantity.unit.trim()}` : ''} · {quantityKindLabels[quantity.quantityKind]}</p>
+          <p className={controls.muted}>{sourceName}</p>
+        </div>
+        <div className={styles.actions}>
+          <button className={controls.ghost} type="button" aria-expanded={open} onClick={() => setOpen((current) => !current)}>{open ? 'Close' : 'Edit'}</button>
+          {onRemove ? <button className={controls.ghost} type="button" onClick={onRemove}>Remove</button> : null}
+          {!onRemove && recorded ? <button className={controls.ghost} type="button" onClick={() => { onChange(clearedQuantity(quantity)); setOpen(false) }}>Remove</button> : null}
+        </div>
+      </div>
+      {open ? (
+        <>
+          <div className={styles.grid}>
+            <label className={controls.stack}>Name<input className={controls.field} value={quantity.name} onChange={(event) => patch({ name: event.target.value })} /></label>
+            <label className={controls.stack}>Value<input className={controls.field} value={quantity.valueText} onChange={(event) => patch({ valueText: event.target.value })} placeholder="Empty if unknown" /></label>
+            <label className={controls.stack}>Unit<input className={controls.field} value={quantity.unit} onChange={(event) => patch({ unit: event.target.value })} /></label>
+            <label className={controls.stack}>
+              Quantity kind
+              <select className={controls.select} value={quantity.quantityKind} onChange={(event) => patch({ quantityKind: event.target.value as QuantityKind })}>
+                {quantityKinds.map((kind) => <option key={kind} value={kind}>{quantityKindLabels[kind]}</option>)}
+              </select>
+            </label>
+            <label className={`${controls.stack} ${styles.wide}`}>
+              Data source
+              <select className={controls.select} value={quantity.evidenceId} onChange={(event) => patch({ evidenceId: event.target.value })}>
+                <option value="">Source not specified</option>
+                {evidence.map((item) => <option key={item.id} value={item.id}>{item.title.trim() || 'Untitled study'}</option>)}
+              </select>
+            </label>
+          </div>
+          <details className={styles.extra}>
+            <summary>Additional parameters</summary>
+            <div className={styles.grid}>
+              <label className={controls.stack}>Measured at<input className={controls.field} value={quantity.measuredAt} onChange={(event) => patch({ measuredAt: event.target.value })} /></label>
+              <label className={controls.stack}>Period start<input className={controls.field} value={quantity.periodStart} onChange={(event) => patch({ periodStart: event.target.value })} /></label>
+              <label className={controls.stack}>Period end<input className={controls.field} value={quantity.periodEnd} onChange={(event) => patch({ periodEnd: event.target.value })} /></label>
+              <label className={`${controls.stack} ${styles.wide}`}>Conditions<textarea className={controls.area} value={quantity.conditions} onChange={(event) => patch({ conditions: event.target.value })} /></label>
+            </div>
+          </details>
+        </>
+      ) : null}
     </div>
   )
 }
 
 function EvidenceEditor({ evidence, onChange, onRemove }: { evidence: EvidenceDraft; onChange: (evidence: EvidenceDraft) => void; onRemove: () => void }) {
+  const [open, setOpen] = useState(evidence.title.trim() === '')
   const patch = (next: Partial<EvidenceDraft>) => onChange({ ...evidence, ...next })
+  const heading = evidence.title.trim() || 'Untitled study'
   return (
-    <div className={styles.entry}>
-      <div className={styles.grid}>
-        <label className={controls.stack}>Title<input className={controls.field} value={evidence.title} onChange={(event) => patch({ title: event.target.value })} /></label>
-        <label className={controls.stack}>Author or organization<input className={controls.field} value={evidence.author} onChange={(event) => patch({ author: event.target.value })} /></label>
-        <label className={controls.stack}>Year<input className={controls.field} value={evidence.yearText} onChange={(event) => patch({ yearText: event.target.value })} placeholder="Empty if unknown" /></label>
-        <label className={controls.stack}>URL<input className={controls.field} value={evidence.url} onChange={(event) => patch({ url: event.target.value })} /></label>
-        <label className={controls.stack}>
-          Source type
-          <select className={controls.select} value={evidence.studyType} onChange={(event) => patch({ studyType: event.target.value as EvidenceStudyType })}>
-            {Object.entries(evidenceStudyLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-          </select>
-        </label>
-        <label className={controls.stack}>
-          Verification
-          <select className={controls.select} value={evidence.verification} onChange={(event) => patch({ verification: event.target.value as EvidenceVerification })}>
-            {Object.entries(evidenceVerificationLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-          </select>
-        </label>
-        <label className={`${controls.stack} ${styles.wide}`}>What this source supports<textarea className={controls.area} value={evidence.supports} onChange={(event) => patch({ supports: event.target.value })} /></label>
+    <div className={styles.measure}>
+      <div className={styles.measureHead}>
+        <div>
+          <strong>{heading}</strong>
+          <p className={controls.muted}>{[evidence.author.trim(), evidence.yearText.trim(), evidenceStudyLabels[evidence.studyType], evidenceVerificationLabels[evidence.verification]].filter(Boolean).join(' · ') || 'No citation details yet'}</p>
+        </div>
+        <div className={styles.actions}>
+          <button className={controls.ghost} type="button" aria-expanded={open} onClick={() => setOpen((current) => !current)}>{open ? 'Close' : 'Edit'}</button>
+          <button className={controls.ghost} type="button" onClick={onRemove}>Remove</button>
+        </div>
       </div>
-      <button className={controls.ghost} type="button" onClick={onRemove}>Remove evidence</button>
+      {open ? (
+        <div className={styles.grid}>
+          <label className={controls.stack}>Name of the study<input className={controls.field} value={evidence.title} onChange={(event) => patch({ title: event.target.value })} /></label>
+          <label className={controls.stack}>Author or organization<input className={controls.field} value={evidence.author} onChange={(event) => patch({ author: event.target.value })} /></label>
+          <label className={controls.stack}>Year of publication<input className={controls.field} value={evidence.yearText} onChange={(event) => patch({ yearText: event.target.value })} placeholder="Empty if unknown" /></label>
+          <label className={controls.stack}>URL<input className={controls.field} value={evidence.url} onChange={(event) => patch({ url: event.target.value })} /></label>
+          <label className={controls.stack}>
+            Type of research
+            <select className={controls.select} value={evidence.studyType} onChange={(event) => patch({ studyType: event.target.value as EvidenceStudyType })}>
+              {Object.entries(evidenceStudyLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+            </select>
+          </label>
+          <label className={controls.stack}>
+            Verification status
+            <select className={controls.select} value={evidence.verification} onChange={(event) => patch({ verification: event.target.value as EvidenceVerification })}>
+              {Object.entries(evidenceVerificationLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+            </select>
+          </label>
+          <label className={`${controls.stack} ${styles.wide}`}>What this source supports<textarea className={controls.area} value={evidence.supports} onChange={(event) => patch({ supports: event.target.value })} /></label>
+        </div>
+      ) : null}
     </div>
   )
 }
@@ -392,6 +448,17 @@ function CardView({ card, links, cards }: { card: CatalogCard; links: CatalogLin
         </div>
       </section>
       <section className={styles.section}>
+        <h2>Evidence</h2>
+        {card.evidence.length === 0 ? <p className={controls.muted}>No studies.</p> : card.evidence.map((item) => (
+          <div key={item.id} className={styles.detail}>
+            <p><strong>{item.title || 'Untitled study'}</strong>{item.year === null ? '' : ` · ${item.year}`}{item.author ? ` · ${item.author}` : ''}</p>
+            <p>{evidenceStudyLabels[item.studyType]} · {evidenceVerificationLabels[item.verification]}</p>
+            {item.url ? <p><a href={item.url}>{item.url}</a></p> : null}
+            {item.supports ? <p>{item.supports}</p> : null}
+          </div>
+        ))}
+      </section>
+      <section className={styles.section}>
         <h2>Measurements</h2>
         {card.quantities.length === 0 ? <p className={controls.muted}>No measurements.</p> : card.quantities.map((quantity) => <QuantityText key={quantity.id} quantity={quantity} evidence={card.evidence} />)}
       </section>
@@ -409,17 +476,6 @@ function CardView({ card, links, cards }: { card: CatalogCard; links: CatalogLin
           </div>
         ))}
         {!card.accounts ? <p className={controls.muted}>No reserve or deficit amounts.</p> : null}
-      </section>
-      <section className={styles.section}>
-        <h2>Evidence</h2>
-        {card.evidence.length === 0 ? <p className={controls.muted}>No studies.</p> : card.evidence.map((item) => (
-          <div key={item.id} className={styles.detail}>
-            <p><strong>{item.title || 'Untitled study'}</strong>{item.year === null ? '' : ` · ${item.year}`}{item.author ? ` · ${item.author}` : ''}</p>
-            <p>{evidenceStudyLabels[item.studyType]} · {evidenceVerificationLabels[item.verification]}</p>
-            {item.url ? <p><a href={item.url}>{item.url}</a></p> : null}
-            {item.supports ? <p>{item.supports}</p> : null}
-          </div>
-        ))}
       </section>
       {card.kind === 'source' ? (
         <section className={styles.section}>
@@ -466,9 +522,17 @@ function QuantityText({ quantity, evidence, label }: { quantity?: MeasuredQuanti
       {quantity.measuredAt ? ` · measured ${quantity.measuredAt}` : ''}
       {quantity.periodStart || quantity.periodEnd ? ` · period ${quantity.periodStart || '…'} to ${quantity.periodEnd || '…'}` : ''}
       {quantity.conditions ? ` · ${quantity.conditions}` : ''}
-      {study ? ` · ${study.title || 'Untitled study'}` : ''}
+      {study ? ` · ${study.title || 'Untitled study'}` : ' · Source not specified'}
     </p>
   )
+}
+
+function quantityHasContent(quantity: QuantityDraft): boolean {
+  return [quantity.name, quantity.valueText, quantity.unit, quantity.measuredAt, quantity.periodStart, quantity.periodEnd, quantity.conditions, quantity.evidenceId].some((value) => value.trim() !== '')
+}
+
+function clearedQuantity(quantity: QuantityDraft): QuantityDraft {
+  return { ...blankMeasurement(), id: quantity.id }
 }
 
 function blankMeasurement(): QuantityDraft {

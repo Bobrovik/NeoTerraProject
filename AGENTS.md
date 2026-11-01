@@ -88,7 +88,7 @@ The working tree may contain edits outside a catalog commit. Do not fold unrelat
 - Keep city layout storage, planet feed cache, and the resource card catalog in separate versioned keys. The layout parser rejects unknown shapes, so catalog cards do not belong in `future-city.layouts.v1`. A link that cites a missing card is rejected rather than stored.
 - Do not reuse `ResourceType` or `ResourceFlow` as the universal card. Those types are city-flow records. A global card needs its own id and optional links to a city id later.
 - Catalog search, filters, and sorting are pure functions. Kind, text, category, scarcity, priority, and status apply together. Text matches name, summary, category, and subcategory.
-- The card form keeps an editing draft and writes a catalog card on save. An empty numeric field stays `null` or omitted. Deleting evidence clears measurement references to that id. A URL does not set verification.
+- The card form keeps an editing draft and writes a catalog card on save. An empty numeric field stays `null` or omitted. Deleting evidence clears measurement references to that id. A URL does not set verification. The form shows name, category, description, status, priority, and scarcity first. Location and image stay in a closed section. Studies are entered once and chosen as a measurement's data source. Extra measurement fields stay closed until opened. Each named account still holds one measurement; several measurements of one kind go in the measurement list.
 - Produces and uses links stay the catalog link records. The network page adds and deletes those records through the same parser and storage key. Replacing a connection is a delete followed by an add. Missing or wrong-kind links and duplicate endpoint pairs are errors. A card with no connection is a warning, and the page does not delete it. The graph is plain SVG in three columns. Above 18 visible nodes it asks for a focus before drawing.
 - Absence of a measurement is not zero. Priority is not scarcity. A stock is not a replenishment rate. Power (kW) is not energy (kWh).
 - Do not invent scientific numbers. A demo value must be labeled demo. A link is not verification.
@@ -104,6 +104,6 @@ The working tree may contain edits outside a catalog commit. Do not fold unrelat
 
 ## Next Steps
 
-Stage 4 is in place: `/catalog/network`, `src/domain/resource-network.ts`, and `src/features/catalog/CatalogNetworkPage.tsx`.
+Stage 4 is in place: `/catalog/network`, `src/domain/resource-network.ts`, and `src/features/catalog/CatalogNetworkPage.tsx`. The card form layout is the compact entry screen in `src/features/catalog/CatalogCardPage.tsx`.
 
 Stop here. Do not start a later catalog stage unless a new task asks for it. Do not seed scientific examples.
