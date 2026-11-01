@@ -15,7 +15,7 @@ Layers:
 - `src/shared` — controls, status, search, breadcrumbs.
 - `src/app` — shell, router, config.
 
-The in-memory catalog (`CatalogSnapshot`) is cities, object categories, city objects, resource types, systems, flows, roads, documents, and tasks. It is not the planned resource/source/consumer card catalog.
+The in-memory catalog (`CatalogSnapshot`) is cities, object categories, city objects, resource types, systems, flows, roads, documents, and tasks. The resource/source/consumer card catalog is a separate domain model in `src/domain/resource-catalog.ts`. Its browser adapter is `src/data/resource-catalog-storage.ts`. There is no catalog page yet.
 
 ## Routing
 
@@ -44,13 +44,22 @@ Defined in `src/domain/types.ts`.
 
 Demo cities Aurora (`city:aurora`) and Meridian (`city:meridian`) stay in the demo snapshot. They do not receive automatic rates or tutorial writes.
 
+Resource catalog cards are global records, not city objects. One card has `kind`: `resource`, `source`, or `consumer`. Shared fields include status, scarcity, and priority. Scarcity is a supply classification. It is separate from physical abundance, total reserves, recoverable reserves, regional availability, and supply deficit. Those accounts are optional measurements. A missing number is `null`.
+
+`quantityKind` is a closed set: `mass`, `volume`, `density`, `power`, `energy`, `productionRate`, `consumptionRate`, `reserve`, `area`, `count`, `efficiency`. Power and energy are different kinds. A stock and a rate are different kinds. There is no unit converter. Optional `measuredAt`, `periodStart`, `periodEnd`, `conditions`, and `evidenceId` sit on a measurement.
+
+Evidence records have their own ids. A measurement may cite one of them. A draft may have an empty evidence list. Source-only and consumer-only fields live in `sourceProfile` and `consumerProfile`.
+
+Links are separate records. `produces` connects a source card to a resource card. `uses` connects a consumer card to a resource card. A link that cites a missing card, or the wrong kind of card, is rejected. A link does not store a rate; rates stay on measurements.
+
 ## Data Persistence
 
-Three separate browser stores. None is a server database.
+Four separate browser stores. None is a server database.
 
 - `future-city.layouts.v1` — city drafts and user cities. File versions `1 | 2`. Writes use version 2. Parse still accepts version 1.
 - City project file `future-city-project` version 1 — one city export/import. Demo ids are not overwritten. An import of a demo city becomes `city:${stem}-imported`.
 - `future-city.planet-feeds.v1` version 1 — cached planet feeds.
+- `future-city.resource-catalog.v1` version 1 — `{ version, cards, links }`. The first read with no key is an empty catalog. A corrupt file or an unknown version is left in place and is not treated as empty. Writes go through the catalog parser and touch only this key. No demonstration cards are seeded.
 
 Missing values stay absent. Do not store a missing number as zero.
 
@@ -61,18 +70,19 @@ Missing values stay absent. Do not store a missing number as zero.
 - Forest and population color countries from national World Bank statistics. They are not forest-stand maps or counts of people inside a shape.
 - Conflicts are UCDP candidate points through the Vite `/ucdp-feed` forward. Country-only precision is not drawn.
 - Minerals are USGS major nonfuel deposits (OFR 2005-1294). Shape and color mark the category. Oil, natural gas, reserves, and mine status are not in that file.
+- Resource catalog types and versioned storage. No catalog route, form, or seeded cards.
 
 ## Current State
 
 Branch: `feature/building-placement`. Remote: `origin` → `https://github.com/Bobrovik/NeoTerraProject.git`.
 
-The resource/source/consumer card catalog is not implemented. Navigation has no Catalog item.
+The resource catalog domain and storage exist. Navigation has no Catalog item.
 
 The working tree may contain edits outside a catalog commit. Do not fold unrelated files into a catalog commit.
 
 ## Technical Decisions
 
-- Keep city layout storage, planet feed cache, and the future card catalog in separate versioned keys. The layout parser rejects unknown shapes, so catalog cards do not belong in `future-city.layouts.v1`.
+- Keep city layout storage, planet feed cache, and the resource card catalog in separate versioned keys. The layout parser rejects unknown shapes, so catalog cards do not belong in `future-city.layouts.v1`. A link that cites a missing card is rejected rather than stored.
 - Do not reuse `ResourceType` or `ResourceFlow` as the universal card. Those types are city-flow records. A global card needs its own id and optional links to a city id later.
 - Absence of a measurement is not zero. Priority is not scarcity. A stock is not a replenishment rate. Power (kW) is not energy (kWh).
 - Do not invent scientific numbers. A demo value must be labeled demo. A link is not verification.
@@ -88,13 +98,6 @@ The working tree may contain edits outside a catalog commit. Do not fold unrelat
 
 ## Next Steps
 
-Stage 1, not started: add a versioned card file and domain types. Proposed shape, still unimplemented:
+Stage 1 is in place: `src/domain/resource-catalog.ts`, `src/domain/resource-catalog.test.ts`, and `src/data/resource-catalog-storage.ts`.
 
-- Storage key `future-city.resource-catalog.v1`, file `{ version: 1, cards, links }`.
-- One card type with `kind`: `resource`, `source`, or `consumer`.
-- Optional `sourceProfile` and `consumerProfile`. Missing fields stay unset.
-- Quantities use `number | null`. Evidence records are separate from the quantity.
-- Links are their own records: source produces resource, consumer uses resource.
-- No seeded scientific examples.
-
-Later stages: `/catalog` route and nav item, then the form, then link editing. Do not start those until the types and storage exist.
+Stage 2, not started: `/catalog` route, navigation item, card list, type marker, search, and filters. Then the form, then link editing in the interface. Do not seed scientific examples.
