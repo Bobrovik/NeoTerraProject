@@ -135,7 +135,7 @@ describe('resource catalog card draft', () => {
     const applied = applyCardDraft(emptyResourceCatalog(), draft, now)
     expect(applied.ok).toBe(false)
     if (!applied.ok) {
-      expect(applied.message).toBe('Выберите карточку ресурса, которая есть в каталоге.')
+      expect(applied.message).toBe('form.resource')
     }
   })
 

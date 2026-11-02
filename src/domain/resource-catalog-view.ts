@@ -1,4 +1,4 @@
-import type { CardStatus, CatalogCard, CatalogCardKind, CharacteristicAspect, EvidenceStudyType, EvidenceVerification, Priority, QuantityKind, Scarcity } from './resource-catalog'
+import type { CardStatus, CatalogCard, CatalogCardKind, Priority, Scarcity } from './resource-catalog'
 
 export type CatalogKindFilter = 'all' | CatalogCardKind
 
@@ -13,75 +13,6 @@ export type CatalogListQuery = {
   status: CardStatus | ''
   sort: CatalogSort
 }
-
-export const catalogKindLabels: Record<CatalogCardKind, string> = {
-  resource: 'Ресурс',
-  source: 'Источник',
-  consumer: 'Потребитель',
-}
-
-export const scarcityLabels: Record<Scarcity, string> = {
-  surplus: 'Избыток',
-  sufficient: 'Достаточно',
-  'limited-access': 'Ограниченный доступ',
-  scarce: 'Дефицит',
-  'critically-scarce': 'Критический дефицит',
-  unknown: 'Неизвестно',
-}
-
-export const priorityLabels: Record<Priority, string> = {
-  P1: 'P1 — критически важно',
-  P2: 'P2 — высокий',
-  P3: 'P3 — средний',
-  P4: 'P4 — низкий',
-}
-
-export const cardStatusLabels: Record<CardStatus, string> = {
-  draft: 'Черновик',
-  verified: 'Проверено',
-  archived: 'Архив',
-}
-
-export const quantityKindLabels: Record<QuantityKind, string> = {
-  mass: 'Масса (Mass)',
-  volume: 'Объём (Volume)',
-  density: 'Плотность (Density)',
-  power: 'Мощность (Power)',
-  energy: 'Энергия (Energy)',
-  productionRate: 'Производство (Production rate)',
-  consumptionRate: 'Потребление (Consumption rate)',
-  reserve: 'Запасы (Reserves)',
-  area: 'Площадь (Area)',
-  count: 'Количество (Count)',
-  efficiency: 'КПД (Efficiency)',
-}
-
-export const characteristicAspectLabels: Record<CharacteristicAspect, string> = {
-  property: 'Физическое свойство',
-  quality: 'Качественная характеристика',
-  requirement: 'Нормативное требование',
-  metric: 'Количественный показатель',
-  operation: 'Производство или потребление',
-}
-
-export const evidenceStudyLabels: Record<EvidenceStudyType, string> = {
-  paper: 'Научная статья',
-  'government-statistics': 'Государственная статистика',
-  study: 'Исследование',
-  'technical-documentation': 'Техническая документация',
-  other: 'Другое',
-}
-
-export const evidenceVerificationLabels: Record<EvidenceVerification, string> = {
-  unreviewed: 'Не проверено',
-  preliminary: 'Предварительно',
-  verified: 'Подтверждено',
-}
-
-export const catalogLinkRoleLabels = {
-  produces: 'производит (produces)',
-  uses: 'использует (uses)',
-} as const
 
 const priorityRank: Record<Priority, number> = { P1: 0, P2: 1, P3: 2, P4: 3 }
 

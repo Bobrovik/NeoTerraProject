@@ -13,16 +13,8 @@ import {
 } from '../../domain/resource-catalog-form'
 import type { CatalogCard, CatalogCardKind, CatalogLink, CharacteristicAspect, EvidenceStudyType, EvidenceVerification, MeasuredQuantity, QuantityKind, ResourceCatalog } from '../../domain/resource-catalog'
 import { quantityKinds } from '../../domain/resource-catalog'
-import {
-  cardStatusLabels,
-  catalogKindLabels,
-  characteristicAspectLabels,
-  evidenceStudyLabels,
-  evidenceVerificationLabels,
-  priorityLabels,
-  quantityKindLabels,
-  scarcityLabels,
-} from '../../domain/resource-catalog-view'
+import { accountLabel, aspectLabel, aspects, imageLabel, kindLabel, priorityLabel, priorities, quantityLabel, scarcityLabel, scarcities, statusLabel, statuses, studyLabel, studyTypes, verificationLabel, verifications } from '../../shared/i18n/catalog-labels'
+import { useI18n } from '../../shared/i18n/useI18n'
 import { EmptyState, ErrorState } from '../../shared/ui/Status'
 import controls from '../../shared/ui/controls.module.css'
 import styles from './CatalogCardPage.module.css'
@@ -34,6 +26,7 @@ function newId(prefix: string): string {
 }
 
 export function CatalogCardPage({ mode }: { mode: 'new' | 'existing' }) {
+  const { t } = useI18n()
   const navigate = useNavigate()
   const { cardId } = useParams()
   const [stored, setStored] = useState(() => readResourceCatalog(localStorage))
@@ -42,22 +35,22 @@ export function CatalogCardPage({ mode }: { mode: 'new' | 'existing' }) {
   const [message, setMessage] = useState<string | undefined>()
 
   if (!stored.ok) {
-    return <ErrorState title="Каталог не удалось прочитать" detail={stored.message} />
+    return <ErrorState title={t('catalog.readTitle')} detail={t(stored.message)} />
   }
   const catalog = stored.catalog
   const card = mode === 'existing' && cardId ? catalog.cards.find((item) => item.id === cardId) : undefined
   if (mode === 'existing' && !card) {
-    return <EmptyState title="Карточка не найдена" detail="Этой карточки нет в сохранённом каталоге." />
+    return <EmptyState title={t('catalog.notFoundTitle')} detail={t('catalog.notFoundDetail')} />
   }
   if (!draft) {
     return (
       <div className={styles.page}>
-        <h1>Новая карточка</h1>
-        <p className={controls.muted}>Выберите тип универсальной карточки.</p>
+        <h1>{t('card.newTitle')}</h1>
+        <p className={controls.muted}>{t('card.newHint')}</p>
         <div className={styles.choice}>
           {kinds.map((kind) => (
             <button key={kind} className={controls.button} type="button" onClick={() => setDraft(createCardDraft({ id: newId('card'), kind, createdAt: new Date().toISOString() }))}>
-              {catalogKindLabels[kind]}
+              {kindLabel(t, kind)}
             </button>
           ))}
         </div>
@@ -71,12 +64,12 @@ export function CatalogCardPage({ mode }: { mode: 'new' | 'existing' }) {
     }
     const next = applyCardDraft(stored.catalog, draft!, new Date().toISOString())
     if (!next.ok) {
-      setMessage(next.message)
+      setMessage(t(next.message))
       return
     }
     const written = writeResourceCatalog(localStorage, next.catalog)
     if (!written.ok) {
-      setMessage(written.message)
+      setMessage(t(written.message))
       return
     }
     const saved = written.catalog.cards.find((item) => item.id === draft!.id)
@@ -107,18 +100,18 @@ export function CatalogCardPage({ mode }: { mode: 'new' | 'existing' }) {
     <div className={styles.page}>
       <header className={styles.heading}>
         <div>
-          <h1>{draft.name.trim() || 'Карточка без названия'}</h1>
-          <p className={controls.muted}>{catalogKindLabels[draft.kind]} · {cardStatusLabels[draft.status]}</p>
+          <h1>{draft.name.trim() || t('card.untitled')}</h1>
+          <p className={controls.muted}>{kindLabel(t, draft.kind)} · {statusLabel(t, draft.status)}</p>
         </div>
         <div className={styles.actions}>
-          <Link className={controls.ghost} to="/catalog">К каталогу</Link>
+          <Link className={controls.ghost} to="/catalog">{t('card.back')}</Link>
           {editing ? (
             <>
-              <button className={controls.button} type="button" onClick={save}>Сохранить</button>
-              <button className={controls.ghost} type="button" onClick={cancel}>Отмена</button>
+              <button className={controls.button} type="button" onClick={save}>{t('card.save')}</button>
+              <button className={controls.ghost} type="button" onClick={cancel}>{t('card.cancel')}</button>
             </>
           ) : (
-            <button className={controls.button} type="button" onClick={() => setEditing(true)}>Изменить</button>
+            <button className={controls.button} type="button" onClick={() => setEditing(true)}>{t('card.edit')}</button>
           )}
         </div>
       </header>
@@ -145,6 +138,7 @@ function initialDraft(mode: 'new' | 'existing', cardId: string | undefined): Car
 }
 
 function CardForm({ draft, catalog, onChange }: { draft: CardDraft; catalog: ResourceCatalog; onChange: (draft: CardDraft) => void }) {
+  const { t } = useI18n()
   const resources = catalog.cards.filter((card) => card.kind === 'resource' && card.id !== draft.id)
   const patch = (next: Partial<CardDraft>) => onChange({ ...draft, ...next })
   const resourceIds = draft.kind === 'source' ? draft.producedResourceIds : draft.usedResourceIds
@@ -153,57 +147,57 @@ function CardForm({ draft, catalog, onChange }: { draft: CardDraft; catalog: Res
   return (
     <>
       <section className={styles.section}>
-        <h2>Основные сведения</h2>
-        <p className={controls.muted}>Карточка описывает универсальный объект. Расположение, фактический запас и текущая работа относятся к экземпляру в городе и здесь не записываются.</p>
+        <h2>{t('card.basic')}</h2>
+        <p className={controls.muted}>{t('card.basicNote')}</p>
         <div className={styles.grid}>
-          <label className={`${controls.stack} ${styles.wide}`}>Название<input className={controls.field} value={draft.name} onChange={(event) => patch({ name: event.target.value })} /></label>
-          <label className={controls.stack}>Категория<input className={controls.field} value={draft.category} onChange={(event) => patch({ category: event.target.value })} /></label>
-          <label className={controls.stack}>Подкатегория<input className={controls.field} value={draft.subcategory} onChange={(event) => patch({ subcategory: event.target.value })} /></label>
-          <label className={`${controls.stack} ${styles.wide}`}>Краткое описание<textarea className={controls.area} value={draft.summary} onChange={(event) => patch({ summary: event.target.value })} /></label>
+          <label className={`${controls.stack} ${styles.wide}`}>{t('card.name')}<input className={controls.field} value={draft.name} onChange={(event) => patch({ name: event.target.value })} /></label>
+          <label className={controls.stack}>{t('card.category')}<input className={controls.field} value={draft.category} onChange={(event) => patch({ category: event.target.value })} /></label>
+          <label className={controls.stack}>{t('card.subcategory')}<input className={controls.field} value={draft.subcategory} onChange={(event) => patch({ subcategory: event.target.value })} /></label>
+          <label className={`${controls.stack} ${styles.wide}`}>{t('card.summary')}<textarea className={controls.area} value={draft.summary} onChange={(event) => patch({ summary: event.target.value })} /></label>
           <label className={controls.stack}>
-            Статус
+            {t('card.status')}
             <select className={controls.select} value={draft.status} onChange={(event) => patch({ status: event.target.value as CardDraft['status'] })}>
-              {Object.entries(cardStatusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+              {statuses.map((status) => <option key={status} value={status}>{statusLabel(t, status)}</option>)}
             </select>
           </label>
           <label className={controls.stack}>
-            Приоритет
+            {t('card.priority')}
             <select className={controls.select} value={draft.priority} onChange={(event) => patch({ priority: event.target.value as CardDraft['priority'] })}>
-              {Object.entries(priorityLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+              {priorities.map((priority) => <option key={priority} value={priority}>{priorityLabel(t, priority)}</option>)}
             </select>
           </label>
           <label className={controls.stack}>
-            Дефицитность
+            {t('card.scarcity')}
             <select className={controls.select} value={draft.scarcity} onChange={(event) => patch({ scarcity: event.target.value as CardDraft['scarcity'] })}>
-              {Object.entries(scarcityLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+              {scarcities.map((scarcity) => <option key={scarcity} value={scarcity}>{scarcityLabel(t, scarcity)}</option>)}
             </select>
           </label>
           <label className={controls.stack}>
-            Тип карточки
+            {t('card.type')}
             <select className={controls.select} value={draft.kind} onChange={(event) => patch({ kind: event.target.value as CatalogCardKind })}>
-              {kinds.map((kind) => <option key={kind} value={kind}>{catalogKindLabels[kind]}</option>)}
+              {kinds.map((kind) => <option key={kind} value={kind}>{kindLabel(t, kind)}</option>)}
             </select>
           </label>
         </div>
         <details className={styles.extra}>
-          <summary>Изображение</summary>
+          <summary>{t('card.image')}</summary>
           <div className={styles.grid}>
             <label className={controls.stack}>
-              Вид изображения
+              {t('card.imageKind')}
               <select className={controls.select} value={draft.imageKind} onChange={(event) => patch({ imageKind: event.target.value as CardDraft['imageKind'] })}>
-                <option value="icon">Значок</option>
-                <option value="photo">Фотография</option>
-                <option value="diagram">Схема</option>
+                <option value="icon">{t('image.icon')}</option>
+                <option value="photo">{t('image.photo')}</option>
+                <option value="diagram">{t('image.diagram')}</option>
               </select>
             </label>
-            <label className={controls.stack}>Адрес изображения<input className={controls.field} value={draft.imageUrl} onChange={(event) => patch({ imageUrl: event.target.value })} /></label>
+            <label className={controls.stack}>{t('card.imageUrl')}<input className={controls.field} value={draft.imageUrl} onChange={(event) => patch({ imageUrl: event.target.value })} /></label>
           </div>
         </details>
       </section>
 
       <section className={styles.section}>
-        <h2>Научные источники (Scientific references)</h2>
-        <p className={controls.muted}>Добавьте исследование один раз и выбирайте его как источник данных у любой характеристики. Адрес страницы не делает исследование подтверждённым. Проверка записывается отдельно. Карточку можно сохранить без исследований.</p>
+        <h2>{t('card.evidence')}</h2>
+        <p className={controls.muted}>{t('card.evidenceNote')}</p>
         {draft.evidence.map((item, index) => (
           <EvidenceEditor
             key={item.id}
@@ -212,79 +206,79 @@ function CardForm({ draft, catalog, onChange }: { draft: CardDraft; catalog: Res
             onRemove={() => onChange(removeEvidenceDraft(draft, item.id))}
           />
         ))}
-        <button className={controls.ghost} type="button" onClick={() => patch({ evidence: [...draft.evidence, blankEvidence()] })}>Добавить исследование</button>
+        <button className={controls.ghost} type="button" onClick={() => patch({ evidence: [...draft.evidence, blankEvidence()] })}>{t('card.addStudy')}</button>
       </section>
 
       <MeasurementGroup
-        title="Свойства и характеристики"
-        note="Добавляйте только нужные свойства. Пустое значение остаётся неизвестным и не записывается как ноль. Единицы не пересчитываются."
+        title={t('card.properties')}
+        note={t('card.propertiesNote')}
         draft={draft}
         aspects={['property']}
         addAspect="property"
         onChange={onChange}
       />
       <MeasurementGroup
-        title="Качество и пригодность"
-        note="Качественная характеристика описывает состав или пригодность. Нормативное требование — записанный предел или условие, а не измеренный образец и не диапазон из двух границ."
+        title={t('card.quality')}
+        note={t('card.qualityNote')}
         draft={draft}
         aspects={['quality', 'requirement']}
         addAspect="quality"
         onChange={onChange}
       />
       <section className={styles.section}>
-        <h2>Количественные показатели</h2>
-        <p className={controls.muted}>Запас, мощность, энергия и расход остаются разными видами величин. Дефицитность выше — это классификация снабжения, а не расчёт.</p>
+        <h2>{t('card.metrics')}</h2>
+        <p className={controls.muted}>{t('card.metricsNote')}</p>
         <MeasurementRows draft={draft} aspects={['metric', '']} onChange={onChange} />
-        <QuantityEditor quantity={draft.physicalAbundance} evidence={draft.evidence} label="Физическое наличие (Physical abundance)" onChange={(physicalAbundance) => patch({ physicalAbundance })} />
-        <QuantityEditor quantity={draft.totalReserves} evidence={draft.evidence} label="Общие запасы (Total reserves)" onChange={(totalReserves) => patch({ totalReserves })} />
-        <QuantityEditor quantity={draft.recoverableReserves} evidence={draft.evidence} label="Извлекаемые запасы (Recoverable reserves)" onChange={(recoverableReserves) => patch({ recoverableReserves })} />
-        <QuantityEditor quantity={draft.supplyDeficit} evidence={draft.evidence} label="Дефицит предложения (Supply deficit)" onChange={(supplyDeficit) => patch({ supplyDeficit })} />
+        <QuantityEditor quantity={draft.physicalAbundance} evidence={draft.evidence} label={accountLabel(t, 'physicalAbundance')} onChange={(physicalAbundance) => patch({ physicalAbundance })} />
+        <QuantityEditor quantity={draft.totalReserves} evidence={draft.evidence} label={accountLabel(t, 'totalReserves')} onChange={(totalReserves) => patch({ totalReserves })} />
+        <QuantityEditor quantity={draft.recoverableReserves} evidence={draft.evidence} label={accountLabel(t, 'recoverableReserves')} onChange={(recoverableReserves) => patch({ recoverableReserves })} />
+        <QuantityEditor quantity={draft.supplyDeficit} evidence={draft.evidence} label={accountLabel(t, 'supplyDeficit')} onChange={(supplyDeficit) => patch({ supplyDeficit })} />
         {draft.regional.map((region, index) => (
           <div key={region.id} className={styles.entry}>
-            <QuantityEditor quantity={region.availability} evidence={draft.evidence} label="Сохранённая величина" onChange={(availability) => updateRegion(draft, index, { availability }, onChange)} />
-            <QuantityEditor quantity={region.supplyDeficit} evidence={draft.evidence} label="Сохранённый дефицит" onChange={(supplyDeficit) => updateRegion(draft, index, { supplyDeficit }, onChange)} />
+            <QuantityEditor quantity={region.availability} evidence={draft.evidence} label={t('card.savedAmount')} onChange={(availability) => updateRegion(draft, index, { availability }, onChange)} />
+            <QuantityEditor quantity={region.supplyDeficit} evidence={draft.evidence} label={t('card.savedDeficit')} onChange={(supplyDeficit) => updateRegion(draft, index, { supplyDeficit }, onChange)} />
           </div>
         ))}
-        <button className={controls.ghost} type="button" onClick={() => patch({ quantities: [...draft.quantities, { ...blankMeasurement(), aspect: 'metric' }] })}>Добавить показатель</button>
+        <button className={controls.ghost} type="button" onClick={() => patch({ quantities: [...draft.quantities, { ...blankMeasurement(), aspect: 'metric' }] })}>{t('card.addMetric')}</button>
       </section>
 
       <section className={styles.section}>
-        <h2>Технологические связи</h2>
-        <p className={controls.muted}>Связи produces и uses остаются раздельными. Одна технологическая сущность позже может и производить ресурс, и потреблять другой. Тип карточки это не запрещает на будущее.</p>
+        <h2>{t('card.technology')}</h2>
+        <p className={controls.muted}>{t('card.technologyNote')}</p>
         <MeasurementRows draft={draft} aspects={['operation']} onChange={onChange} />
-        <button className={controls.ghost} type="button" onClick={() => patch({ quantities: [...draft.quantities, { ...blankMeasurement(), aspect: 'operation' }] })}>Добавить технологическую характеристику</button>
+        <button className={controls.ghost} type="button" onClick={() => patch({ quantities: [...draft.quantities, { ...blankMeasurement(), aspect: 'operation' }] })}>{t('card.addOperation')}</button>
         {draft.kind === 'source' ? (
           <>
-            <ResourceChoices resources={resources} selected={resourceIds} onChange={setResourceIds} label="Производимые ресурсы" />
-            <QuantityEditor quantity={draft.productionVolume} evidence={draft.evidence} label="Объём производства (Production volume)" onChange={(productionVolume) => patch({ productionVolume })} />
-            <QuantityEditor quantity={draft.outputPerTime} evidence={draft.evidence} label="Выпуск за время (Output per time)" onChange={(outputPerTime) => patch({ outputPerTime })} />
-            <QuantityEditor quantity={draft.maxCapacity} evidence={draft.evidence} label="Ёмкость (Capacity)" onChange={(maxCapacity) => patch({ maxCapacity })} />
-            <QuantityEditor quantity={draft.energyCost} evidence={draft.evidence} label="Энергопотребление (Energy consumption)" onChange={(energyCost) => patch({ energyCost })} />
-            <QuantityEditor quantity={draft.efficiency} evidence={draft.evidence} label="КПД (Efficiency)" onChange={(efficiency) => patch({ efficiency })} />
-            <QuantityEditor quantity={draft.footprint} evidence={draft.evidence} label="Площадь воздействия (Footprint)" onChange={(footprint) => patch({ footprint })} />
-            <label className={controls.stack}>Условия работы<textarea className={controls.area} value={draft.sourceOperations} onChange={(event) => patch({ sourceOperations: event.target.value })} /></label>
+            <ResourceChoices resources={resources} selected={resourceIds} onChange={setResourceIds} label={t('card.produced')} />
+            <QuantityEditor quantity={draft.productionVolume} evidence={draft.evidence} label={accountLabel(t, 'productionVolume')} onChange={(productionVolume) => patch({ productionVolume })} />
+            <QuantityEditor quantity={draft.outputPerTime} evidence={draft.evidence} label={accountLabel(t, 'outputPerTime')} onChange={(outputPerTime) => patch({ outputPerTime })} />
+            <QuantityEditor quantity={draft.maxCapacity} evidence={draft.evidence} label={accountLabel(t, 'maxCapacity')} onChange={(maxCapacity) => patch({ maxCapacity })} />
+            <QuantityEditor quantity={draft.energyCost} evidence={draft.evidence} label={accountLabel(t, 'energyCost')} onChange={(energyCost) => patch({ energyCost })} />
+            <QuantityEditor quantity={draft.efficiency} evidence={draft.evidence} label={accountLabel(t, 'efficiency')} onChange={(efficiency) => patch({ efficiency })} />
+            <QuantityEditor quantity={draft.footprint} evidence={draft.evidence} label={accountLabel(t, 'footprint')} onChange={(footprint) => patch({ footprint })} />
+            <label className={controls.stack}>{t('card.operations')}<textarea className={controls.area} value={draft.sourceOperations} onChange={(event) => patch({ sourceOperations: event.target.value })} /></label>
             <label className={controls.stack}>
-              Непрерывная работа
+              {t('card.continuous')}
               <select className={controls.select} value={draft.continuous} onChange={(event) => patch({ continuous: event.target.value as CardDraft['continuous'] })}>
-                <option value="">Неизвестно</option>
-                <option value="yes">Да</option>
-                <option value="no">Нет</option>
+                <option value="">{t('card.unknown')}</option>
+                <option value="yes">{t('card.yes')}</option>
+                <option value="no">{t('card.no')}</option>
               </select>
             </label>
-            <label className={controls.stack}>Природные условия<textarea className={controls.area} value={draft.naturalConditions} onChange={(event) => patch({ naturalConditions: event.target.value })} /></label>
+            <label className={controls.stack}>{t('card.natural')}<textarea className={controls.area} value={draft.naturalConditions} onChange={(event) => patch({ naturalConditions: event.target.value })} /></label>
           </>
         ) : null}
         {draft.kind === 'consumer' ? (
           <>
-            <ResourceChoices resources={resources} selected={resourceIds} onChange={setResourceIds} label="Используемые ресурсы" />
-            <QuantityEditor quantity={draft.quantityUsed} evidence={draft.evidence} label="Используемое количество (Quantity used)" onChange={(quantityUsed) => patch({ quantityUsed })} />
-            <label className={controls.stack}>Единица времени<input className={controls.field} value={draft.timeUnit} onChange={(event) => patch({ timeUnit: event.target.value })} /></label>
-            <QuantityEditor quantity={draft.peakLoad} evidence={draft.evidence} label="Пиковая нагрузка (Peak load)" onChange={(peakLoad) => patch({ peakLoad })} />
-            <QuantityEditor quantity={draft.averageLoad} evidence={draft.evidence} label="Средняя нагрузка (Average load)" onChange={(averageLoad) => patch({ averageLoad })} />
-            <label className={controls.stack}>Число обслуживаемых<input className={controls.field} value={draft.servedText} onChange={(event) => patch({ servedText: event.target.value })} placeholder="Пусто, если неизвестно" /></label>
-            <label className={controls.stack}>Условия работы<textarea className={controls.area} value={draft.consumerOperations} onChange={(event) => patch({ consumerOperations: event.target.value })} /></label>
-            <label className={controls.stack}>Обработка отходов<textarea className={controls.area} value={draft.wasteProcessing} onChange={(event) => patch({ wasteProcessing: event.target.value })} /></label>
-            <label className={controls.stack}>Побочные продукты<textarea className={controls.area} value={draft.byproducts} onChange={(event) => patch({ byproducts: event.target.value })} /></label>
+            <ResourceChoices resources={resources} selected={resourceIds} onChange={setResourceIds} label={t('card.used')} />
+            <QuantityEditor quantity={draft.quantityUsed} evidence={draft.evidence} label={accountLabel(t, 'quantityUsed')} onChange={(quantityUsed) => patch({ quantityUsed })} />
+            <label className={controls.stack}>{t('card.timeUnit')}<input className={controls.field} value={draft.timeUnit} onChange={(event) => patch({ timeUnit: event.target.value })} /></label>
+            <QuantityEditor quantity={draft.peakLoad} evidence={draft.evidence} label={accountLabel(t, 'peakLoad')} onChange={(peakLoad) => patch({ peakLoad })} />
+            <QuantityEditor quantity={draft.averageLoad} evidence={draft.evidence} label={accountLabel(t, 'averageLoad')} onChange={(averageLoad) => patch({ averageLoad })} />
+            <label className={controls.stack}>{t('card.served')}<input className={controls.field} value={draft.servedText} onChange={(event) => patch({ servedText: event.target.value })} placeholder={t('card.servedEmpty')} /></label>
+            <label className={controls.stack}>{t('card.operations')}<textarea className={controls.area} value={draft.consumerOperations} onChange={(event) => patch({ consumerOperations: event.target.value })} /></label>
+            <label className={controls.stack}>{t('card.waste')}<textarea className={controls.area} value={draft.wasteProcessing} onChange={(event) => patch({ wasteProcessing: event.target.value })} /></label>
+            <label className={controls.stack}>{t('card.byproducts')}<textarea className={controls.area} value={draft.byproducts} onChange={(event) => patch({ byproducts: event.target.value })} /></label>
           </>
         ) : null}
       </section>
@@ -292,7 +286,7 @@ function CardForm({ draft, catalog, onChange }: { draft: CardDraft; catalog: Res
   )
 }
 
-function MeasurementGroup({ title, note, draft, aspects, addAspect, onChange }: {
+function MeasurementGroup({ title, note, draft, aspects: visibleAspects, addAspect, onChange }: {
   title: string
   note: string
   draft: CardDraft
@@ -300,22 +294,23 @@ function MeasurementGroup({ title, note, draft, aspects, addAspect, onChange }: 
   addAspect: CharacteristicAspect
   onChange: (draft: CardDraft) => void
 }) {
+  const { t } = useI18n()
   return (
     <section className={styles.section}>
       <h2>{title}</h2>
       <p className={controls.muted}>{note}</p>
-      <MeasurementRows draft={draft} aspects={aspects} onChange={onChange} />
-      <button className={controls.ghost} type="button" onClick={() => onChange({ ...draft, quantities: [...draft.quantities, { ...blankMeasurement(), aspect: addAspect }] })}>Добавить характеристику</button>
+      <MeasurementRows draft={draft} aspects={visibleAspects} onChange={onChange} />
+      <button className={controls.ghost} type="button" onClick={() => onChange({ ...draft, quantities: [...draft.quantities, { ...blankMeasurement(), aspect: addAspect }] })}>{t('card.addCharacteristic')}</button>
     </section>
   )
 }
 
-function MeasurementRows({ draft, aspects, onChange }: {
+function MeasurementRows({ draft, aspects: visibleAspects, onChange }: {
   draft: CardDraft
   aspects: Array<QuantityDraft['aspect']>
   onChange: (draft: CardDraft) => void
 }) {
-  return draft.quantities.map((quantity, index) => aspects.includes(quantity.aspect) ? (
+  return draft.quantities.map((quantity, index) => visibleAspects.includes(quantity.aspect) ? (
     <QuantityEditor
       key={quantity.id}
       quantity={quantity}
@@ -333,22 +328,23 @@ function QuantityEditor({ quantity, evidence, label, onChange, onRemove }: {
   onChange: (quantity: QuantityDraft) => void
   onRemove?: () => void
 }) {
+  const { t } = useI18n()
   const recorded = quantityHasContent(quantity)
   const [open, setOpen] = useState(Boolean(onRemove) && !recorded)
   const patch = (next: Partial<QuantityDraft>) => onChange({ ...quantity, ...next })
   const study = quantity.evidenceId ? evidence.find((item) => item.id === quantity.evidenceId) : undefined
-  const sourceName = quantity.evidenceId ? (study?.title.trim() || 'Исследование без названия') : 'Источник не указан'
-  const value = quantity.valueText.trim() === '' ? 'неизвестно' : quantity.valueText.trim()
-  const title = label || quantity.name.trim() || 'Характеристика'
+  const sourceName = quantity.evidenceId ? (study?.title.trim() || t('card.untitledStudy')) : t('card.sourceMissing')
+  const value = quantity.valueText.trim() === '' ? t('card.unknownValue') : quantity.valueText.trim()
+  const title = label || quantity.name.trim() || t('card.characteristic')
 
   if (!recorded && !open) {
     return (
       <div className={styles.measure}>
         <div>
           <strong>{title}</strong>
-          <p className={controls.muted}>Значение не записано.</p>
+          <p className={controls.muted}>{t('card.notRecorded')}</p>
         </div>
-        <button className={controls.ghost} type="button" onClick={() => setOpen(true)}>Добавить</button>
+        <button className={controls.ghost} type="button" onClick={() => setOpen(true)}>{t('card.add')}</button>
       </div>
     )
   }
@@ -358,49 +354,49 @@ function QuantityEditor({ quantity, evidence, label, onChange, onRemove }: {
       <div className={styles.measureHead}>
         <div>
           <strong>{title}</strong>
-          <p>{quantity.name.trim() || 'Без названия'} · {value}{quantity.unit.trim() ? ` ${quantity.unit.trim()}` : ''} · {quantityKindLabels[quantity.quantityKind]}{quantity.aspect ? ` · ${characteristicAspectLabels[quantity.aspect]}` : ''}</p>
+          <p>{quantity.name.trim() || t('catalog.untitled')} · {value}{quantity.unit.trim() ? ` ${quantity.unit.trim()}` : ''} · {quantityLabel(t, quantity.quantityKind)}{quantity.aspect ? ` · ${aspectLabel(t, quantity.aspect)}` : ''}</p>
           <p className={controls.muted}>{sourceName}</p>
         </div>
         <div className={styles.actions}>
-          <button className={controls.ghost} type="button" aria-expanded={open} onClick={() => setOpen((current) => !current)}>{open ? 'Закрыть' : 'Изменить'}</button>
-          {onRemove ? <button className={controls.ghost} type="button" onClick={onRemove}>Удалить</button> : null}
-          {!onRemove && recorded ? <button className={controls.ghost} type="button" onClick={() => { onChange(clearedQuantity(quantity)); setOpen(false) }}>Удалить</button> : null}
+          <button className={controls.ghost} type="button" aria-expanded={open} onClick={() => setOpen((current) => !current)}>{open ? t('card.close') : t('card.edit')}</button>
+          {onRemove ? <button className={controls.ghost} type="button" onClick={onRemove}>{t('card.remove')}</button> : null}
+          {!onRemove && recorded ? <button className={controls.ghost} type="button" onClick={() => { onChange(clearedQuantity(quantity)); setOpen(false) }}>{t('card.remove')}</button> : null}
         </div>
       </div>
       {open ? (
         <>
           <div className={styles.grid}>
-            <label className={controls.stack}>Название<input className={controls.field} value={quantity.name} onChange={(event) => patch({ name: event.target.value })} /></label>
-            <label className={controls.stack}>Значение<input className={controls.field} value={quantity.valueText} onChange={(event) => patch({ valueText: event.target.value })} placeholder="Пусто, если неизвестно" /></label>
-            <label className={controls.stack}>Единица измерения<input className={controls.field} value={quantity.unit} onChange={(event) => patch({ unit: event.target.value })} /></label>
+            <label className={controls.stack}>{t('card.name')}<input className={controls.field} value={quantity.name} onChange={(event) => patch({ name: event.target.value })} /></label>
+            <label className={controls.stack}>{t('card.value')}<input className={controls.field} value={quantity.valueText} onChange={(event) => patch({ valueText: event.target.value })} placeholder={t('card.servedEmpty')} /></label>
+            <label className={controls.stack}>{t('card.unit')}<input className={controls.field} value={quantity.unit} onChange={(event) => patch({ unit: event.target.value })} /></label>
             <label className={controls.stack}>
-              Вид величины
+              {t('card.quantityKind')}
               <select className={controls.select} value={quantity.quantityKind} onChange={(event) => patch({ quantityKind: event.target.value as QuantityKind })}>
-                {quantityKinds.map((kind) => <option key={kind} value={kind}>{quantityKindLabels[kind]}</option>)}
+                {quantityKinds.map((kind) => <option key={kind} value={kind}>{quantityLabel(t, kind)}</option>)}
               </select>
             </label>
             <label className={controls.stack}>
-              Группа
+              {t('card.group')}
               <select className={controls.select} value={quantity.aspect} onChange={(event) => patch({ aspect: event.target.value as CharacteristicAspect })}>
-                <option value="">Количественный показатель</option>
-                {Object.entries(characteristicAspectLabels).map(([value, aspectLabel]) => <option key={value} value={value}>{aspectLabel}</option>)}
+                <option value="">{t('aspect.metric')}</option>
+                {aspects.map((aspect) => <option key={aspect} value={aspect}>{aspectLabel(t, aspect)}</option>)}
               </select>
             </label>
             <label className={`${controls.stack} ${styles.wide}`}>
-              Источник данных
+              {t('card.dataSource')}
               <select className={controls.select} value={quantity.evidenceId} onChange={(event) => patch({ evidenceId: event.target.value })}>
-                <option value="">Источник не указан</option>
-                {evidence.map((item) => <option key={item.id} value={item.id}>{item.title.trim() || 'Исследование без названия'}</option>)}
+                <option value="">{t('card.sourceMissing')}</option>
+                {evidence.map((item) => <option key={item.id} value={item.id}>{item.title.trim() || t('card.untitledStudy')}</option>)}
               </select>
             </label>
           </div>
           <details className={styles.extra}>
-            <summary>Дополнительные параметры</summary>
+            <summary>{t('card.extra')}</summary>
             <div className={styles.grid}>
-              <label className={controls.stack}>Дата измерения<input className={controls.field} value={quantity.measuredAt} onChange={(event) => patch({ measuredAt: event.target.value })} /></label>
-              <label className={controls.stack}>Начало периода<input className={controls.field} value={quantity.periodStart} onChange={(event) => patch({ periodStart: event.target.value })} /></label>
-              <label className={controls.stack}>Конец периода<input className={controls.field} value={quantity.periodEnd} onChange={(event) => patch({ periodEnd: event.target.value })} /></label>
-              <label className={`${controls.stack} ${styles.wide}`}>Условия<textarea className={controls.area} value={quantity.conditions} onChange={(event) => patch({ conditions: event.target.value })} /></label>
+              <label className={controls.stack}>{t('card.measuredAt')}<input className={controls.field} value={quantity.measuredAt} onChange={(event) => patch({ measuredAt: event.target.value })} /></label>
+              <label className={controls.stack}>{t('card.periodStart')}<input className={controls.field} value={quantity.periodStart} onChange={(event) => patch({ periodStart: event.target.value })} /></label>
+              <label className={controls.stack}>{t('card.periodEnd')}<input className={controls.field} value={quantity.periodEnd} onChange={(event) => patch({ periodEnd: event.target.value })} /></label>
+              <label className={`${controls.stack} ${styles.wide}`}>{t('card.conditions')}<textarea className={controls.area} value={quantity.conditions} onChange={(event) => patch({ conditions: event.target.value })} /></label>
             </div>
           </details>
         </>
@@ -410,40 +406,41 @@ function QuantityEditor({ quantity, evidence, label, onChange, onRemove }: {
 }
 
 function EvidenceEditor({ evidence, onChange, onRemove }: { evidence: EvidenceDraft; onChange: (evidence: EvidenceDraft) => void; onRemove: () => void }) {
+  const { t } = useI18n()
   const [open, setOpen] = useState(evidence.title.trim() === '')
   const patch = (next: Partial<EvidenceDraft>) => onChange({ ...evidence, ...next })
-  const heading = evidence.title.trim() || 'Исследование без названия'
+  const heading = evidence.title.trim() || t('card.untitledStudy')
   return (
     <div className={styles.measure}>
       <div className={styles.measureHead}>
         <div>
           <strong>{heading}</strong>
-          <p className={controls.muted}>{[evidence.author.trim(), evidence.yearText.trim(), evidenceStudyLabels[evidence.studyType], evidenceVerificationLabels[evidence.verification]].filter(Boolean).join(' · ') || 'Сведений о ссылке пока нет'}</p>
+          <p className={controls.muted}>{[evidence.author.trim(), evidence.yearText.trim(), studyLabel(t, evidence.studyType), verificationLabel(t, evidence.verification)].filter(Boolean).join(' · ') || t('card.noReference')}</p>
         </div>
         <div className={styles.actions}>
-          <button className={controls.ghost} type="button" aria-expanded={open} onClick={() => setOpen((current) => !current)}>{open ? 'Закрыть' : 'Изменить'}</button>
-          <button className={controls.ghost} type="button" onClick={onRemove}>Удалить</button>
+          <button className={controls.ghost} type="button" aria-expanded={open} onClick={() => setOpen((current) => !current)}>{open ? t('card.close') : t('card.edit')}</button>
+          <button className={controls.ghost} type="button" onClick={onRemove}>{t('card.remove')}</button>
         </div>
       </div>
       {open ? (
         <div className={styles.grid}>
-          <label className={controls.stack}>Название исследования<input className={controls.field} value={evidence.title} onChange={(event) => patch({ title: event.target.value })} /></label>
-          <label className={controls.stack}>Автор или организация<input className={controls.field} value={evidence.author} onChange={(event) => patch({ author: event.target.value })} /></label>
-          <label className={controls.stack}>Год публикации<input className={controls.field} value={evidence.yearText} onChange={(event) => patch({ yearText: event.target.value })} placeholder="Пусто, если неизвестен" /></label>
-          <label className={controls.stack}>Адрес страницы<input className={controls.field} value={evidence.url} onChange={(event) => patch({ url: event.target.value })} /></label>
+          <label className={controls.stack}>{t('card.studyName')}<input className={controls.field} value={evidence.title} onChange={(event) => patch({ title: event.target.value })} /></label>
+          <label className={controls.stack}>{t('card.author')}<input className={controls.field} value={evidence.author} onChange={(event) => patch({ author: event.target.value })} /></label>
+          <label className={controls.stack}>{t('card.year')}<input className={controls.field} value={evidence.yearText} onChange={(event) => patch({ yearText: event.target.value })} placeholder={t('card.yearEmpty')} /></label>
+          <label className={controls.stack}>{t('card.url')}<input className={controls.field} value={evidence.url} onChange={(event) => patch({ url: event.target.value })} /></label>
           <label className={controls.stack}>
-            Тип исследования
+            {t('card.studyType')}
             <select className={controls.select} value={evidence.studyType} onChange={(event) => patch({ studyType: event.target.value as EvidenceStudyType })}>
-              {Object.entries(evidenceStudyLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+              {studyTypes.map((studyType) => <option key={studyType} value={studyType}>{studyLabel(t, studyType)}</option>)}
             </select>
           </label>
           <label className={controls.stack}>
-            Статус проверки
+            {t('card.verification')}
             <select className={controls.select} value={evidence.verification} onChange={(event) => patch({ verification: event.target.value as EvidenceVerification })}>
-              {Object.entries(evidenceVerificationLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+              {verifications.map((verification) => <option key={verification} value={verification}>{verificationLabel(t, verification)}</option>)}
             </select>
           </label>
-          <label className={`${controls.stack} ${styles.wide}`}>Что подтверждает источник<textarea className={controls.area} value={evidence.supports} onChange={(event) => patch({ supports: event.target.value })} /></label>
+          <label className={`${controls.stack} ${styles.wide}`}>{t('card.supports')}<textarea className={controls.area} value={evidence.supports} onChange={(event) => patch({ supports: event.target.value })} /></label>
         </div>
       ) : null}
     </div>
@@ -451,10 +448,11 @@ function EvidenceEditor({ evidence, onChange, onRemove }: { evidence: EvidenceDr
 }
 
 function ResourceChoices({ resources, selected, onChange, label }: { resources: CatalogCard[]; selected: string[]; onChange: (ids: string[]) => void; label: string }) {
+  const { t } = useI18n()
   return (
     <div className={styles.links}>
       <h3>{label}</h3>
-      {resources.length === 0 ? <p className={controls.muted}>Карточек ресурсов пока нет.</p> : null}
+      {resources.length === 0 ? <p className={controls.muted}>{t('card.noResources')}</p> : null}
       {resources.map((resource) => (
         <label key={resource.id}>
           <input
@@ -462,7 +460,7 @@ function ResourceChoices({ resources, selected, onChange, label }: { resources: 
             checked={selected.includes(resource.id)}
             onChange={(event) => onChange(event.target.checked ? [...selected, resource.id] : selected.filter((id) => id !== resource.id))}
           />
-          {' '}{resource.name.trim() || 'Без названия'}
+          {' '}{resource.name.trim() || t('catalog.untitled')}
         </label>
       ))}
     </div>
@@ -470,80 +468,81 @@ function ResourceChoices({ resources, selected, onChange, label }: { resources: 
 }
 
 function CardView({ card, links, cards }: { card: CatalogCard; links: CatalogLink[]; cards: CatalogCard[] }) {
+  const { t } = useI18n()
   const produced = links.filter((link) => link.role === 'produces' && link.sourceId === card.id)
   const used = links.filter((link) => link.role === 'uses' && link.consumerId === card.id)
-  const nameOf = (id: string) => cards.find((item) => item.id === id)?.name.trim() || 'Без названия'
-  const grouped = (aspects: Array<MeasuredQuantity['aspect'] | undefined>) => card.quantities.filter((quantity) => aspects.includes(quantity.aspect))
+  const nameOf = (id: string) => cards.find((item) => item.id === id)?.name.trim() || t('catalog.untitled')
+  const grouped = (groups: Array<MeasuredQuantity['aspect'] | undefined>) => card.quantities.filter((quantity) => groups.includes(quantity.aspect))
   return (
     <>
       <section className={styles.section}>
-        <h2>Основные сведения</h2>
+        <h2>{t('card.basic')}</h2>
         <div className={styles.detail}>
-          <p>{catalogKindLabels[card.kind]} · {card.category || 'Без категории'}{card.subcategory ? ` · ${card.subcategory}` : ''}</p>
-          <p>{card.summary || 'Описания нет'}</p>
-          <p>{scarcityLabels[card.scarcity]} · {priorityLabels[card.priority]} · {cardStatusLabels[card.status]}</p>
-          {card.image ? <p>{card.image.kind}: {card.image.url}</p> : null}
-          <p className={controls.muted}>Создано {card.createdAt} · Изменено {card.updatedAt}</p>
+          <p>{kindLabel(t, card.kind)} · {card.category || t('catalog.noCategory')}{card.subcategory ? ` · ${card.subcategory}` : ''}</p>
+          <p>{card.summary || t('card.noDescription')}</p>
+          <p>{scarcityLabel(t, card.scarcity)} · {priorityLabel(t, card.priority)} · {statusLabel(t, card.status)}</p>
+          {card.image ? <p>{imageLabel(t, card.image.kind)}: {card.image.url}</p> : null}
+          <p className={controls.muted}>{t('card.created')} {card.createdAt} · {t('card.modified')} {card.updatedAt}</p>
         </div>
       </section>
       <section className={styles.section}>
-        <h2>Научные источники (Scientific references)</h2>
-        {card.evidence.length === 0 ? <p className={controls.muted}>Исследований нет.</p> : card.evidence.map((item) => (
+        <h2>{t('card.evidence')}</h2>
+        {card.evidence.length === 0 ? <p className={controls.muted}>{t('card.noStudies')}</p> : card.evidence.map((item) => (
           <div key={item.id} className={styles.detail}>
-            <p><strong>{item.title || 'Исследование без названия'}</strong>{item.year === null ? '' : ` · ${item.year}`}{item.author ? ` · ${item.author}` : ''}</p>
-            <p>{evidenceStudyLabels[item.studyType]} · {evidenceVerificationLabels[item.verification]}</p>
+            <p><strong>{item.title || t('card.untitledStudy')}</strong>{item.year === null ? '' : ` · ${item.year}`}{item.author ? ` · ${item.author}` : ''}</p>
+            <p>{studyLabel(t, item.studyType)} · {verificationLabel(t, item.verification)}</p>
             {item.url ? <p><a href={item.url}>{item.url}</a></p> : null}
             {item.supports ? <p>{item.supports}</p> : null}
           </div>
         ))}
       </section>
-      <QuantityGroup title="Свойства и характеристики" quantities={grouped(['property'])} evidence={card.evidence} empty="Свойства не записаны." />
-      <QuantityGroup title="Качество и пригодность" quantities={grouped(['quality', 'requirement'])} evidence={card.evidence} empty="Качественные характеристики и требования не записаны." />
+      <QuantityGroup title={t('card.properties')} quantities={grouped(['property'])} evidence={card.evidence} empty={t('card.noProperties')} />
+      <QuantityGroup title={t('card.quality')} quantities={grouped(['quality', 'requirement'])} evidence={card.evidence} empty={t('card.noQuality')} />
       <section className={styles.section}>
-        <h2>Количественные показатели</h2>
+        <h2>{t('card.metrics')}</h2>
         {grouped(['metric', undefined]).map((quantity) => <QuantityText key={quantity.id} quantity={quantity} evidence={card.evidence} />)}
-        <QuantityText label="Физическое наличие (Physical abundance)" quantity={card.accounts?.physicalAbundance} evidence={card.evidence} />
-        <QuantityText label="Общие запасы (Total reserves)" quantity={card.accounts?.totalReserves} evidence={card.evidence} />
-        <QuantityText label="Извлекаемые запасы (Recoverable reserves)" quantity={card.accounts?.recoverableReserves} evidence={card.evidence} />
-        <QuantityText label="Дефицит предложения (Supply deficit)" quantity={card.accounts?.supplyDeficit} evidence={card.evidence} />
+        <QuantityText label={accountLabel(t, 'physicalAbundance')} quantity={card.accounts?.physicalAbundance} evidence={card.evidence} />
+        <QuantityText label={accountLabel(t, 'totalReserves')} quantity={card.accounts?.totalReserves} evidence={card.evidence} />
+        <QuantityText label={accountLabel(t, 'recoverableReserves')} quantity={card.accounts?.recoverableReserves} evidence={card.evidence} />
+        <QuantityText label={accountLabel(t, 'supplyDeficit')} quantity={card.accounts?.supplyDeficit} evidence={card.evidence} />
         {card.accounts?.regional.map((region) => (
           <div key={region.id}>
-            <QuantityText label="Сохранённая величина" quantity={region.availability} evidence={card.evidence} />
-            <QuantityText label="Сохранённый дефицит" quantity={region.supplyDeficit} evidence={card.evidence} />
+            <QuantityText label={t('card.savedAmount')} quantity={region.availability} evidence={card.evidence} />
+            <QuantityText label={t('card.savedDeficit')} quantity={region.supplyDeficit} evidence={card.evidence} />
           </div>
         ))}
       </section>
       <section className={styles.section}>
-        <h2>Технологические связи</h2>
+        <h2>{t('card.technology')}</h2>
         {grouped(['operation']).map((quantity) => <QuantityText key={quantity.id} quantity={quantity} evidence={card.evidence} />)}
         {card.kind === 'source' ? (
           <>
-            <p>{produced.length === 0 ? 'Производимых ресурсов нет.' : `Производит: ${produced.map((link) => nameOf(link.resourceId)).join(', ')}`}</p>
-            <QuantityText label="Объём производства (Production volume)" quantity={card.sourceProfile?.productionVolume} evidence={card.evidence} />
-            <QuantityText label="Выпуск за время (Output per time)" quantity={card.sourceProfile?.outputPerTime} evidence={card.evidence} />
-            <QuantityText label="Ёмкость (Capacity)" quantity={card.sourceProfile?.maxCapacity} evidence={card.evidence} />
-            <QuantityText label="Энергопотребление (Energy consumption)" quantity={card.sourceProfile?.energyCost} evidence={card.evidence} />
-            <QuantityText label="КПД (Efficiency)" quantity={card.sourceProfile?.efficiency} evidence={card.evidence} />
-            <QuantityText label="Площадь воздействия (Footprint)" quantity={card.sourceProfile?.footprint} evidence={card.evidence} />
-            {card.sourceProfile?.operations ? <p>Условия работы: {card.sourceProfile.operations}</p> : null}
-            {card.sourceProfile?.continuous === undefined ? null : <p>Непрерывная работа: {card.sourceProfile.continuous ? 'Да' : 'Нет'}</p>}
-            {card.sourceProfile?.naturalConditions ? <p>Природные условия: {card.sourceProfile.naturalConditions}</p> : null}
+            <p>{produced.length === 0 ? t('card.producesNone') : t('card.produces', { name: produced.map((link) => nameOf(link.resourceId)).join(', ') })}</p>
+            <QuantityText label={accountLabel(t, 'productionVolume')} quantity={card.sourceProfile?.productionVolume} evidence={card.evidence} />
+            <QuantityText label={accountLabel(t, 'outputPerTime')} quantity={card.sourceProfile?.outputPerTime} evidence={card.evidence} />
+            <QuantityText label={accountLabel(t, 'maxCapacity')} quantity={card.sourceProfile?.maxCapacity} evidence={card.evidence} />
+            <QuantityText label={accountLabel(t, 'energyCost')} quantity={card.sourceProfile?.energyCost} evidence={card.evidence} />
+            <QuantityText label={accountLabel(t, 'efficiency')} quantity={card.sourceProfile?.efficiency} evidence={card.evidence} />
+            <QuantityText label={accountLabel(t, 'footprint')} quantity={card.sourceProfile?.footprint} evidence={card.evidence} />
+            {card.sourceProfile?.operations ? <p>{t('card.labeled', { label: t('card.operations'), name: card.sourceProfile.operations })}</p> : null}
+            {card.sourceProfile?.continuous === undefined ? null : <p>{t('card.continuousValue', { name: card.sourceProfile.continuous ? t('card.yes') : t('card.no') })}</p>}
+            {card.sourceProfile?.naturalConditions ? <p>{t('card.labeled', { label: t('card.natural'), name: card.sourceProfile.naturalConditions })}</p> : null}
           </>
         ) : null}
         {card.kind === 'consumer' ? (
           <>
-            <p>{used.length === 0 ? 'Используемых ресурсов нет.' : `Использует: ${used.map((link) => nameOf(link.resourceId)).join(', ')}`}</p>
-            <QuantityText label="Используемое количество (Quantity used)" quantity={card.consumerProfile?.quantityUsed} evidence={card.evidence} />
-            {card.consumerProfile?.timeUnit ? <p>Единица времени: {card.consumerProfile.timeUnit}</p> : null}
-            <QuantityText label="Пиковая нагрузка (Peak load)" quantity={card.consumerProfile?.peakLoad} evidence={card.evidence} />
-            <QuantityText label="Средняя нагрузка (Average load)" quantity={card.consumerProfile?.averageLoad} evidence={card.evidence} />
-            {card.consumerProfile ? <p>Число обслуживаемых: {card.consumerProfile.served === undefined || card.consumerProfile.served === null ? 'Неизвестно' : card.consumerProfile.served}</p> : null}
-            {card.consumerProfile?.operations ? <p>Условия работы: {card.consumerProfile.operations}</p> : null}
-            {card.consumerProfile?.wasteProcessing ? <p>Обработка отходов: {card.consumerProfile.wasteProcessing}</p> : null}
-            {card.consumerProfile?.byproducts ? <p>Побочные продукты: {card.consumerProfile.byproducts}</p> : null}
+            <p>{used.length === 0 ? t('card.usesNone') : t('card.uses', { name: used.map((link) => nameOf(link.resourceId)).join(', ') })}</p>
+            <QuantityText label={accountLabel(t, 'quantityUsed')} quantity={card.consumerProfile?.quantityUsed} evidence={card.evidence} />
+            {card.consumerProfile?.timeUnit ? <p>{t('card.labeled', { label: t('card.timeUnit'), name: card.consumerProfile.timeUnit })}</p> : null}
+            <QuantityText label={accountLabel(t, 'peakLoad')} quantity={card.consumerProfile?.peakLoad} evidence={card.evidence} />
+            <QuantityText label={accountLabel(t, 'averageLoad')} quantity={card.consumerProfile?.averageLoad} evidence={card.evidence} />
+            {card.consumerProfile ? <p>{t('card.servedValue', { name: card.consumerProfile.served === undefined || card.consumerProfile.served === null ? t('card.unknown') : String(card.consumerProfile.served) })}</p> : null}
+            {card.consumerProfile?.operations ? <p>{t('card.labeled', { label: t('card.operations'), name: card.consumerProfile.operations })}</p> : null}
+            {card.consumerProfile?.wasteProcessing ? <p>{t('card.labeled', { label: t('card.waste'), name: card.consumerProfile.wasteProcessing })}</p> : null}
+            {card.consumerProfile?.byproducts ? <p>{t('card.labeled', { label: t('card.byproducts'), name: card.consumerProfile.byproducts })}</p> : null}
           </>
         ) : null}
-        {card.kind === 'resource' ? <p className={controls.muted}>Связи produces и uses задаются на карточках источника и потребителя.</p> : null}
+        {card.kind === 'resource' ? <p className={controls.muted}>{t('card.resourceLinksNote')}</p> : null}
       </section>
     </>
   )
@@ -559,19 +558,21 @@ function QuantityGroup({ title, quantities, evidence, empty }: { title: string; 
 }
 
 function QuantityText({ quantity, evidence, label }: { quantity?: MeasuredQuantity; evidence: CatalogCard['evidence']; label?: string }) {
+  const { t } = useI18n()
   if (!quantity) {
     return null
   }
   const study = quantity.evidenceId ? evidence.find((item) => item.id === quantity.evidenceId) : undefined
-  const value = quantity.value === null ? 'нет значения' : String(quantity.value)
+  const value = quantity.value === null ? t('card.noValue') : String(quantity.value)
+  const period = `${quantity.periodStart || '…'} — ${quantity.periodEnd || '…'}`
   return (
     <p>
-      {label ? `${label}: ` : ''}{quantity.name || 'Характеристика'} · {value} {quantity.unit} · {quantityKindLabels[quantity.quantityKind]}
-      {quantity.aspect ? ` · ${characteristicAspectLabels[quantity.aspect]}` : ''}
-      {quantity.measuredAt ? ` · измерено ${quantity.measuredAt}` : ''}
-      {quantity.periodStart || quantity.periodEnd ? ` · период ${quantity.periodStart || '…'} — ${quantity.periodEnd || '…'}` : ''}
+      {label ? `${label}: ` : ''}{quantity.name || t('card.characteristic')} · {value} {quantity.unit} · {quantityLabel(t, quantity.quantityKind)}
+      {quantity.aspect ? ` · ${aspectLabel(t, quantity.aspect)}` : ''}
+      {quantity.measuredAt ? ` · ${t('card.measured', { name: quantity.measuredAt })}` : ''}
+      {quantity.periodStart || quantity.periodEnd ? ` · ${t('card.period', { name: period })}` : ''}
       {quantity.conditions ? ` · ${quantity.conditions}` : ''}
-      {study ? ` · ${study.title || 'Исследование без названия'}` : ' · Источник не указан'}
+      {study ? ` · ${study.title || t('card.untitledStudy')}` : ` · ${t('card.sourceMissing')}`}
     </p>
   )
 }

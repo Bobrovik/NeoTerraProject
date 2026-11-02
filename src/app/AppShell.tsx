@@ -1,24 +1,27 @@
 import { useEffect } from 'react'
-import { Link, NavLink, Outlet } from 'react-router'
+import { Link, NavLink, Outlet, useLocation } from 'react-router'
 import { useCatalogState } from '../data/useCatalog'
+import { useI18n } from '../shared/i18n/useI18n'
+import { LanguageSwitcher } from '../shared/i18n/LanguageSwitcher'
 import { Breadcrumbs } from '../shared/ui/Breadcrumbs'
 import { SearchField } from '../shared/ui/SearchField'
 import { ErrorState, LoadingState } from '../shared/ui/Status'
 import { appConfig } from './config'
 import styles from './AppShell.module.css'
 
-const links = [
-  { to: '/', label: 'Home', end: true },
-  { to: '/planet', label: 'Planet', end: false },
-  { to: '/catalog', label: 'Каталог', end: false },
-  { to: '/editor', label: 'Editor', end: false },
-  { to: '/documents', label: 'Documents', end: false },
-  { to: '/tasks', label: 'Tasks', end: false },
-  { to: '/about', label: 'About', end: false },
-]
-
 export function AppShell() {
   const catalog = useCatalogState()
+  const { t } = useI18n()
+  const location = useLocation()
+  const links = [
+    { to: '/', label: 'Home', end: true },
+    { to: '/planet', label: 'Planet', end: false },
+    { to: '/catalog', label: t('nav.catalog'), end: false },
+    { to: '/editor', label: 'Editor', end: false },
+    { to: '/documents', label: 'Documents', end: false },
+    { to: '/tasks', label: 'Tasks', end: false },
+    { to: '/about', label: 'About', end: false },
+  ]
 
   useEffect(() => {
     document.title = appConfig.name
@@ -35,7 +38,10 @@ export function AppShell() {
             </NavLink>
           ))}
         </nav>
-        {catalog.status === 'ready' ? <SearchField /> : <span />}
+        <div className={styles.tools}>
+          {location.pathname.startsWith('/catalog') ? <LanguageSwitcher /> : null}
+          {catalog.status === 'ready' ? <SearchField /> : <span />}
+        </div>
       </header>
       <main className={styles.main}>
         {catalog.status === 'loading' ? <LoadingState /> : null}

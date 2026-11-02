@@ -84,8 +84,8 @@ describe('resource network links', () => {
     power.accounts = { regional: [], supplyDeficit: { id: 'qty:gap', name: 'Gap', value: null, unit: 'kWh', quantityKind: 'energy' } }
     const solar = card('source', 'card:solar', 'Solar power plant')
     solar.sourceProfile = { maxCapacity: { id: 'qty:cap', name: 'Capacity', value: 0, unit: 'kW', quantityKind: 'power' } }
-    expect(measurementLines(power)).toEqual(['Supply deficit: Gap · no value kWh'])
-    expect(measurementLines(solar)).toEqual(['Maximum capacity: Capacity · 0 kW'])
+    expect(measurementLines(power)).toEqual([{ account: 'supplyDeficit', name: 'Gap', value: null, unit: 'kWh' }])
+    expect(measurementLines(solar)).toEqual([{ account: 'maxCapacity', name: 'Capacity', value: 0, unit: 'kW' }])
   })
 
   it('writes a connection through the catalog store and reads it back', () => {

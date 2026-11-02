@@ -1,3 +1,5 @@
+import { catalogFailure, type CatalogMessageCode } from './catalog-message'
+
 export const resourceCatalogVersion = 1 as const
 
 export type CatalogCardKind = 'resource' | 'source' | 'consumer'
@@ -140,7 +142,7 @@ export type ResourceCatalog = {
   links: CatalogLink[]
 }
 
-export type CatalogRead = { ok: true; catalog: ResourceCatalog } | { ok: false; message: string }
+export type CatalogRead = { ok: true; catalog: ResourceCatalog } | { ok: false; message: CatalogMessageCode }
 
 export function emptyResourceCatalog(): ResourceCatalog {
   return { version: resourceCatalogVersion, cards: [], links: [] }
@@ -174,13 +176,13 @@ export function createCatalogCard(input: {
 
 export function parseResourceCatalog(value: unknown): CatalogRead {
   if (!isRecord(value)) {
-    return { ok: false, message: 'The resource catalog file is not an object.' }
+    return catalogFailure('catalog.not-object')
   }
   if (value.version !== resourceCatalogVersion) {
-    return { ok: false, message: 'Версия файла каталога не поддерживается.' }
+    return catalogFailure('catalog.version')
   }
   if (!Array.isArray(value.cards) || !Array.isArray(value.links)) {
-    return { ok: false, message: 'The resource catalog is missing cards or links.' }
+    return catalogFailure('catalog.missing-lists')
   }
   const cards: CatalogCard[] = []
   const seenCards = new Set<string>()
@@ -190,7 +192,7 @@ export function parseResourceCatalog(value: unknown): CatalogRead {
       return card
     }
     if (seenCards.has(card.card.id)) {
-      return { ok: false, message: 'The resource catalog repeats a card id.' }
+      return catalogFailure('catalog.repeat-card')
     }
     seenCards.add(card.card.id)
     cards.push(card.card)
@@ -203,7 +205,7 @@ export function parseResourceCatalog(value: unknown): CatalogRead {
       return link
     }
     if (seenLinks.has(link.link.id)) {
-      return { ok: false, message: 'The resource catalog repeats a link id.' }
+      return catalogFailure('catalog.repeat-link')
     }
     seenLinks.add(link.link.id)
     links.push(link.link)
@@ -211,9 +213,9 @@ export function parseResourceCatalog(value: unknown): CatalogRead {
   return { ok: true, catalog: { version: resourceCatalogVersion, cards, links } }
 }
 
-function parseCard(value: unknown): { ok: true; card: CatalogCard } | { ok: false; message: string } {
+function parseCard(value: unknown): { ok: true; card: CatalogCard } | { ok: false; message: CatalogMessageCode } {
   if (!isRecord(value)) {
-    return { ok: false, message: 'A catalog card is not an object.' }
+    return catalogFailure('card.not-object')
   }
   const id = readId(value.id)
   const name = readText(value.name)
@@ -222,10 +224,10 @@ function parseCard(value: unknown): { ok: true; card: CatalogCard } | { ok: fals
   const createdAt = readId(value.createdAt)
   const updatedAt = readId(value.updatedAt)
   if (!id || name === undefined || category === undefined || summary === undefined || !createdAt || !updatedAt) {
-    return { ok: false, message: 'A catalog card is missing an id or a text field.' }
+    return catalogFailure('card.missing-text')
   }
   if (!isCardKind(value.kind) || !isCardStatus(value.status) || !isScarcity(value.scarcity) || !isPriority(value.priority)) {
-    return { ok: false, message: 'A catalog card has a kind, status, scarcity, or priority that is not supported.' }
+    return catalogFailure('card.unsupported-status')
   }
   const evidence = parseEvidenceList(value.evidence)
   if (!evidence.ok) {
@@ -248,10 +250,10 @@ function parseCard(value: unknown): { ok: true; card: CatalogCard } | { ok: fals
     return consumerProfile
   }
   if (sourceProfile.profile && value.kind !== 'source') {
-    return { ok: false, message: 'A source profile belongs only on a source card.' }
+    return catalogFailure('card.source-profile')
   }
   if (consumerProfile.profile && value.kind !== 'consumer') {
-    return { ok: false, message: 'A consumer profile belongs only on a consumer card.' }
+    return catalogFailure('card.consumer-profile')
   }
   const image = parseImage(value.image)
   if (!image.ok) {
@@ -260,7 +262,7 @@ function parseCard(value: unknown): { ok: true; card: CatalogCard } | { ok: fals
   const subcategory = readOptionalString(value, 'subcategory')
   const legacyPlace = [readOptionalString(value, 'cityId'), readOptionalString(value, 'regionId'), readOptionalString(value, 'regionLabel')]
   if (!subcategory.ok || legacyPlace.some((field) => !field.ok)) {
-    return { ok: false, message: 'A catalog card has a text field that is not a string.' }
+    return catalogFailure('card.bad-text')
   }
   const card: CatalogCard = {
     id,
@@ -286,38 +288,38 @@ function parseCard(value: unknown): { ok: true; card: CatalogCard } | { ok: fals
   return { ok: true, card }
 }
 
-function parseLink(value: unknown, cards: CatalogCard[]): { ok: true; link: CatalogLink } | { ok: false; message: string } {
+function parseLink(value: unknown, cards: CatalogCard[]): { ok: true; link: CatalogLink } | { ok: false; message: CatalogMessageCode } {
   if (!isRecord(value) || (value.role !== 'produces' && value.role !== 'uses')) {
-    return { ok: false, message: 'A catalog link has a role that is not supported.' }
+    return catalogFailure('link.role')
   }
   const id = readId(value.id)
   const resourceId = readId(value.resourceId)
   if (!id || !resourceId) {
-    return { ok: false, message: 'A catalog link is missing an id.' }
+    return catalogFailure('link.missing-id')
   }
   const resource = cards.find((card) => card.id === resourceId)
   if (!resource || resource.kind !== 'resource') {
-    return { ok: false, message: 'A catalog link cites a resource card that does not exist.' }
+    return catalogFailure('link.missing-resource')
   }
   if (value.role === 'produces') {
     const sourceId = readId(value.sourceId)
     const source = sourceId ? cards.find((card) => card.id === sourceId) : undefined
     if (!sourceId || !source || source.kind !== 'source') {
-      return { ok: false, message: 'A catalog link cites a source card that does not exist.' }
+      return catalogFailure('link.missing-source')
     }
     return { ok: true, link: { id, role: 'produces', sourceId, resourceId } }
   }
   const consumerId = readId(value.consumerId)
   const consumer = consumerId ? cards.find((card) => card.id === consumerId) : undefined
   if (!consumerId || !consumer || consumer.kind !== 'consumer') {
-    return { ok: false, message: 'A catalog link cites a consumer card that does not exist.' }
+    return catalogFailure('link.missing-consumer')
   }
   return { ok: true, link: { id, role: 'uses', consumerId, resourceId } }
 }
 
-function parseEvidenceList(value: unknown): { ok: true; evidence: Evidence[]; ids: Set<string> } | { ok: false; message: string } {
+function parseEvidenceList(value: unknown): { ok: true; evidence: Evidence[]; ids: Set<string> } | { ok: false; message: CatalogMessageCode } {
   if (!Array.isArray(value)) {
-    return { ok: false, message: 'A catalog card is missing its evidence list.' }
+    return catalogFailure('evidence.missing-list')
   }
   const evidence: Evidence[] = []
   const ids = new Set<string>()
@@ -327,7 +329,7 @@ function parseEvidenceList(value: unknown): { ok: true; evidence: Evidence[]; id
       return parsed
     }
     if (ids.has(parsed.evidence.id)) {
-      return { ok: false, message: 'A catalog card repeats an evidence id.' }
+      return catalogFailure('evidence.repeat')
     }
     ids.add(parsed.evidence.id)
     evidence.push(parsed.evidence)
@@ -335,24 +337,24 @@ function parseEvidenceList(value: unknown): { ok: true; evidence: Evidence[]; id
   return { ok: true, evidence, ids }
 }
 
-function parseEvidence(value: unknown): { ok: true; evidence: Evidence } | { ok: false; message: string } {
+function parseEvidence(value: unknown): { ok: true; evidence: Evidence } | { ok: false; message: CatalogMessageCode } {
   if (!isRecord(value)) {
-    return { ok: false, message: 'An evidence record is not an object.' }
+    return catalogFailure('evidence.not-object')
   }
   const id = readId(value.id)
   const title = readText(value.title)
   const author = readText(value.author)
   const supports = readText(value.supports)
   if (!id || title === undefined || author === undefined || supports === undefined) {
-    return { ok: false, message: 'An evidence record is missing an id or a text field.' }
+    return catalogFailure('evidence.missing-text')
   }
   if (!isStudyType(value.studyType) || !isVerification(value.verification)) {
-    return { ok: false, message: 'An evidence record has a study type or verification status that is not supported.' }
+    return catalogFailure('evidence.unsupported')
   }
   const year = value.year === undefined ? null : readNullableNumber(value.year)
   const url = value.url === undefined || value.url === null ? null : readText(value.url)
   if (year === undefined || url === undefined) {
-    return { ok: false, message: 'An evidence record has a year or URL that is not usable.' }
+    return catalogFailure('evidence.bad-year')
   }
   return {
     ok: true,
@@ -360,9 +362,9 @@ function parseEvidence(value: unknown): { ok: true; evidence: Evidence } | { ok:
   }
 }
 
-function parseQuantityList(value: unknown, evidenceIds: Set<string>): { ok: true; quantities: MeasuredQuantity[] } | { ok: false; message: string } {
+function parseQuantityList(value: unknown, evidenceIds: Set<string>): { ok: true; quantities: MeasuredQuantity[] } | { ok: false; message: CatalogMessageCode } {
   if (!Array.isArray(value)) {
-    return { ok: false, message: 'A catalog card is missing its measurements.' }
+    return catalogFailure('quantity.missing-list')
   }
   const quantities: MeasuredQuantity[] = []
   const ids = new Set<string>()
@@ -372,7 +374,7 @@ function parseQuantityList(value: unknown, evidenceIds: Set<string>): { ok: true
       return parsed
     }
     if (ids.has(parsed.quantity.id)) {
-      return { ok: false, message: 'A catalog card repeats a measurement id.' }
+      return catalogFailure('quantity.repeat')
     }
     ids.add(parsed.quantity.id)
     quantities.push(parsed.quantity)
@@ -380,22 +382,22 @@ function parseQuantityList(value: unknown, evidenceIds: Set<string>): { ok: true
   return { ok: true, quantities }
 }
 
-function parseQuantity(value: unknown, evidenceIds: Set<string>): { ok: true; quantity: MeasuredQuantity } | { ok: false; message: string } {
+function parseQuantity(value: unknown, evidenceIds: Set<string>): { ok: true; quantity: MeasuredQuantity } | { ok: false; message: CatalogMessageCode } {
   if (!isRecord(value)) {
-    return { ok: false, message: 'A measurement is not an object.' }
+    return catalogFailure('quantity.not-object')
   }
   const id = readId(value.id)
   const name = readText(value.name)
   const unit = readText(value.unit)
   if (!id || name === undefined || unit === undefined || !isQuantityKind(value.quantityKind)) {
-    return { ok: false, message: 'A measurement is missing an id, a name, a unit, or a quantity kind.' }
+    return catalogFailure('quantity.missing-fields')
   }
   if (!('value' in value)) {
-    return { ok: false, message: 'A measurement must include value as a number or null.' }
+    return catalogFailure('quantity.bad-value')
   }
   const amount = readNullableNumber(value.value)
   if (amount === undefined) {
-    return { ok: false, message: 'A measurement must include value as a number or null.' }
+    return catalogFailure('quantity.bad-value')
   }
   const measuredAt = readOptionalString(value, 'measuredAt')
   const periodStart = readOptionalString(value, 'periodStart')
@@ -403,13 +405,13 @@ function parseQuantity(value: unknown, evidenceIds: Set<string>): { ok: true; qu
   const conditions = readOptionalString(value, 'conditions')
   const evidenceId = readOptionalString(value, 'evidenceId')
   if (!measuredAt.ok || !periodStart.ok || !periodEnd.ok || !conditions.ok || !evidenceId.ok) {
-    return { ok: false, message: 'A measurement has a text field that is not a string.' }
+    return catalogFailure('quantity.bad-text')
   }
   if (evidenceId.value !== undefined && !evidenceIds.has(evidenceId.value)) {
-    return { ok: false, message: 'Измерение ссылается на исследование, которого нет в карточке.' }
+    return catalogFailure('quantity.missing-evidence')
   }
   if ('aspect' in value && value.aspect !== undefined && !isCharacteristicAspect(value.aspect)) {
-    return { ok: false, message: 'A measurement has a characteristic group that is not supported.' }
+    return catalogFailure('quantity.bad-aspect')
   }
   const quantity: MeasuredQuantity = { id, name, value: amount, unit, quantityKind: value.quantityKind }
   assignOptional(quantity, {
@@ -423,12 +425,12 @@ function parseQuantity(value: unknown, evidenceIds: Set<string>): { ok: true; qu
   return { ok: true, quantity }
 }
 
-function parseAccounts(value: unknown, evidenceIds: Set<string>): { ok: true; accounts?: ResourceAccounts } | { ok: false; message: string } {
+function parseAccounts(value: unknown, evidenceIds: Set<string>): { ok: true; accounts?: ResourceAccounts } | { ok: false; message: CatalogMessageCode } {
   if (value === undefined) {
     return { ok: true }
   }
   if (!isRecord(value) || !Array.isArray(value.regional)) {
-    return { ok: false, message: 'Resource accounts are not usable.' }
+    return catalogFailure('accounts.unusable')
   }
   const regional: RegionalAvailability[] = []
   for (const entry of value.regional) {
@@ -452,18 +454,18 @@ function parseAccounts(value: unknown, evidenceIds: Set<string>): { ok: true; ac
   return { ok: true, accounts }
 }
 
-function parseRegion(value: unknown, evidenceIds: Set<string>): { ok: true; region: RegionalAvailability } | { ok: false; message: string } {
+function parseRegion(value: unknown, evidenceIds: Set<string>): { ok: true; region: RegionalAvailability } | { ok: false; message: CatalogMessageCode } {
   if (!isRecord(value)) {
-    return { ok: false, message: 'A regional availability record is not an object.' }
+    return catalogFailure('region.not-object')
   }
   const id = readId(value.id)
   if (!id) {
-    return { ok: false, message: 'A regional availability record is missing an id.' }
+    return catalogFailure('region.missing-id')
   }
   const regionId = readOptionalString(value, 'regionId')
   const regionLabel = readOptionalString(value, 'regionLabel')
   if (!regionId.ok || !regionLabel.ok) {
-    return { ok: false, message: 'A regional availability record has a text field that is not a string.' }
+    return catalogFailure('region.bad-text')
   }
   const availability = parseOptionalQuantity(value.availability, evidenceIds)
   const supplyDeficit = parseOptionalQuantity(value.supplyDeficit, evidenceIds)
@@ -481,12 +483,12 @@ function parseRegion(value: unknown, evidenceIds: Set<string>): { ok: true; regi
   return { ok: true, region }
 }
 
-function parseSourceProfile(value: unknown, evidenceIds: Set<string>): { ok: true; profile?: SourceProfile } | { ok: false; message: string } {
+function parseSourceProfile(value: unknown, evidenceIds: Set<string>): { ok: true; profile?: SourceProfile } | { ok: false; message: CatalogMessageCode } {
   if (value === undefined) {
     return { ok: true }
   }
   if (!isRecord(value)) {
-    return { ok: false, message: 'A source profile is not an object.' }
+    return catalogFailure('source.not-object')
   }
   const profile: SourceProfile = {}
   const fields = ['productionVolume', 'outputPerTime', 'maxCapacity', 'energyCost', 'efficiency', 'footprint'] as const
@@ -502,10 +504,10 @@ function parseSourceProfile(value: unknown, evidenceIds: Set<string>): { ok: tru
   const operations = readOptionalString(value, 'operations')
   const naturalConditions = readOptionalString(value, 'naturalConditions')
   if (!operations.ok || !naturalConditions.ok) {
-    return { ok: false, message: 'A source profile has a text field that is not a string.' }
+    return catalogFailure('source.bad-text')
   }
   if ('continuous' in value && value.continuous !== undefined && typeof value.continuous !== 'boolean') {
-    return { ok: false, message: 'A source profile has a continuous flag that is not true or false.' }
+    return catalogFailure('source.bad-continuous')
   }
   assignOptional(profile, {
     operations: operations.value,
@@ -515,12 +517,12 @@ function parseSourceProfile(value: unknown, evidenceIds: Set<string>): { ok: tru
   return { ok: true, profile }
 }
 
-function parseConsumerProfile(value: unknown, evidenceIds: Set<string>): { ok: true; profile?: ConsumerProfile } | { ok: false; message: string } {
+function parseConsumerProfile(value: unknown, evidenceIds: Set<string>): { ok: true; profile?: ConsumerProfile } | { ok: false; message: CatalogMessageCode } {
   if (value === undefined) {
     return { ok: true }
   }
   if (!isRecord(value)) {
-    return { ok: false, message: 'A consumer profile is not an object.' }
+    return catalogFailure('consumer.not-object')
   }
   const profile: ConsumerProfile = {}
   const fields = ['quantityUsed', 'peakLoad', 'averageLoad'] as const
@@ -538,12 +540,12 @@ function parseConsumerProfile(value: unknown, evidenceIds: Set<string>): { ok: t
   const wasteProcessing = readOptionalString(value, 'wasteProcessing')
   const byproducts = readOptionalString(value, 'byproducts')
   if (!timeUnit.ok || !operations.ok || !wasteProcessing.ok || !byproducts.ok) {
-    return { ok: false, message: 'A consumer profile has a text field that is not a string.' }
+    return catalogFailure('consumer.bad-text')
   }
   if ('served' in value && value.served !== undefined) {
     const served = readNullableNumber(value.served)
     if (served === undefined) {
-      return { ok: false, message: 'A consumer profile has a served count that is not a number or null.' }
+      return catalogFailure('consumer.bad-served')
     }
     profile.served = served
   }
@@ -556,7 +558,7 @@ function parseConsumerProfile(value: unknown, evidenceIds: Set<string>): { ok: t
   return { ok: true, profile }
 }
 
-function parseOptionalQuantity(value: unknown, evidenceIds: Set<string>): { ok: true; quantity?: MeasuredQuantity } | { ok: false; message: string } {
+function parseOptionalQuantity(value: unknown, evidenceIds: Set<string>): { ok: true; quantity?: MeasuredQuantity } | { ok: false; message: CatalogMessageCode } {
   if (value === undefined) {
     return { ok: true }
   }
@@ -567,12 +569,12 @@ function parseOptionalQuantity(value: unknown, evidenceIds: Set<string>): { ok: 
   return { ok: true, quantity: parsed.quantity }
 }
 
-function parseImage(value: unknown): { ok: true; image?: CatalogImage } | { ok: false; message: string } {
+function parseImage(value: unknown): { ok: true; image?: CatalogImage } | { ok: false; message: CatalogMessageCode } {
   if (value === undefined) {
     return { ok: true }
   }
   if (!isRecord(value) || (value.kind !== 'icon' && value.kind !== 'photo' && value.kind !== 'diagram') || typeof value.url !== 'string') {
-    return { ok: false, message: 'A catalog image is not usable.' }
+    return catalogFailure('image.unusable')
   }
   return { ok: true, image: { kind: value.kind, url: value.url } }
 }

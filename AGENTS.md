@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-NeoTerraProject (package `future-city`, product name Future City) is a browser research model of a resource-based city and planet. It connects planetary resource layers, city layouts, objects, systems, documents, and tasks. The city and planet interface is English. The resource catalog pages are Russian. One id is meant to identify the same thing in the mesh, the inspector, a system membership, and a flow endpoint.
+NeoTerraProject (package `future-city`, product name Future City) is a browser research model of a resource-based city and planet. It connects planetary resource layers, city layouts, objects, systems, documents, and tasks. The city and planet interface is English. The resource catalog interface can be shown in English or Russian; English is the default. One id is meant to identify the same thing in the mesh, the inspector, a system membership, and a flow endpoint.
 
 ## Architecture
 
@@ -57,12 +57,13 @@ Links are separate records. `produces` connects a source card to a resource card
 
 ## Data Persistence
 
-Four separate browser stores. None is a server database.
+Four separate browser stores, plus one interface-settings record. None is a server database.
 
 - `future-city.layouts.v1` — city drafts and user cities. File versions `1 | 2`. Writes use version 2. Parse still accepts version 1.
 - City project file `future-city-project` version 1 — one city export/import. Demo ids are not overwritten. An import of a demo city becomes `city:${stem}-imported`.
 - `future-city.planet-feeds.v1` version 1 — cached planet feeds.
-- `future-city.resource-catalog.v1` version 1 — `{ version, cards, links }`. The first read with no key is an empty catalog. A corrupt file or an unknown version is left in place and is not treated as empty. Writes go through the catalog parser and touch only this key. No demonstration cards are seeded.
+- `future-city.resource-catalog.v1` version 1 — `{ version, cards, links }`. The first read with no key is an empty catalog. A corrupt file or an unknown version is left in place and is not treated as empty. Writes go through the catalog parser and touch only this key. No demonstration cards are seeded. The file does not store translations of a card.
+- `future-city.settings.v1` version 1 — `{ version, language }` where language is `en` or `ru`. A missing, corrupt, or unknown file is read as English and is not overwritten until the user chooses a language. The choice is interface copy only.
 
 Missing values stay absent. Do not store a missing number as zero.
 
@@ -88,7 +89,7 @@ The working tree may contain edits outside a catalog commit. Do not fold unrelat
 - Keep city layout storage, planet feed cache, and the resource card catalog in separate versioned keys. The layout parser rejects unknown shapes, so catalog cards do not belong in `future-city.layouts.v1`. A link that cites a missing card is rejected rather than stored.
 - Do not reuse `ResourceType` or `ResourceFlow` as the universal card. Those types are city-flow records. A universal card has its own id. A city instance, when one exists, points at that card and keeps location, stock, and actual performance for itself.
 - Catalog search, filters, and sorting are pure functions. Kind, text, category, scarcity, priority, and status apply together. Text matches name, summary, category, and subcategory.
-- The card form keeps an editing draft and writes a catalog card on save. An empty numeric field stays `null` or omitted. Deleting evidence clears measurement references to that id. A URL does not set verification. The catalog UI is Russian. The form shows name, category, description, status, priority, and scarcity first. Image stays in a closed section. Studies are entered once and chosen as a measurement's data source. Extra measurement fields stay closed until opened. Characteristics are added by group: property, quality or requirement, metric, and operation. Each named account still holds one measurement; several measurements of one kind go in the measurement list.
+- The card form keeps an editing draft and writes a catalog card on save. An empty numeric field stays `null` or omitted. Deleting evidence clears measurement references to that id. A URL does not set verification. Catalog labels, buttons, statuses, and messages come from `src/shared/i18n`. A new language is another dictionary with the same keys; components are not rewritten for it. The RU / EN switcher is `LanguageSwitcher`, shown on catalog routes, and the saved choice also sets the catalog navigation label. Names, descriptions, categories, units, conditions, and study text stay as entered. The form shows name, category, description, status, priority, and scarcity first. Image stays in a closed section. Studies are entered once and chosen as a measurement's data source. Extra measurement fields stay closed until opened. Characteristics are added by group: property, quality or requirement, metric, and operation. Each named account still holds one measurement; several measurements of one kind go in the measurement list. Catalog failures are stable codes in `src/domain/catalog-message.ts`; the page translates the code.
 - Produces and uses links stay the catalog link records. The network page adds and deletes those records through the same parser and storage key. Replacing a connection is a delete followed by an add. Missing or wrong-kind links and duplicate endpoint pairs are errors. A card with no connection is a warning, and the page does not delete it. The graph is plain SVG in three columns. Above 18 visible nodes it asks for a focus before drawing.
 - Absence of a measurement is not zero. Priority is not scarcity. A stock is not a replenishment rate. Power (kW) is not energy (kWh).
 - Do not invent scientific numbers. A demo value must be labeled demo. A link is not verification.
@@ -104,6 +105,6 @@ The working tree may contain edits outside a catalog commit. Do not fold unrelat
 
 ## Next Steps
 
-The catalog is a universal library. City placement, actual stock, and current performance stay out of the card. The compact Russian form is `src/features/catalog/CatalogCardPage.tsx`.
+The catalog is a universal library. City placement, actual stock, and current performance stay out of the card. The compact bilingual form is `src/features/catalog/CatalogCardPage.tsx`.
 
 Stop here. Do not start a city-instance catalog stage unless a new task asks for it. Do not seed scientific examples.

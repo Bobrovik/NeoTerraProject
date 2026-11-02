@@ -4,6 +4,7 @@ import { RouterProvider } from 'react-router'
 import { router } from './app/router'
 import { CatalogProvider } from './data/CatalogProvider'
 import { demoCatalogSource } from './data/demo'
+import { LanguageProvider } from './shared/i18n/LanguageProvider'
 import './shared/styles/tokens.css'
 
 const root = document.getElementById('root')
@@ -13,8 +14,10 @@ if (!root) {
 
 createRoot(root).render(
   <StrictMode>
-    <CatalogProvider source={demoCatalogSource}>
-      <RouterProvider router={router} />
-    </CatalogProvider>
+    <LanguageProvider>
+      <CatalogProvider source={demoCatalogSource}>
+        <RouterProvider router={router} />
+      </CatalogProvider>
+    </LanguageProvider>
   </StrictMode>,
 )

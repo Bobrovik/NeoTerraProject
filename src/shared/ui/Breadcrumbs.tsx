@@ -3,9 +3,11 @@ import { isCityEditorPath } from '../../features/city/city-view'
 import { getCity, getDocument, getObject, getSystem } from '../../domain/queries'
 import { readResourceCatalog } from '../../data/resource-catalog-storage'
 import { useReadyCatalog } from '../../data/useCatalog'
+import { useI18n } from '../i18n/useI18n'
 import styles from './Breadcrumbs.module.css'
 
 export function Breadcrumbs() {
+  const { t } = useI18n()
   const { snapshot } = useReadyCatalog()
   const { cityId, objectId, systemId, documentId, cardId } = useParams()
   const location = useLocation()
@@ -40,15 +42,15 @@ export function Breadcrumbs() {
     }
   } else if (location.pathname.startsWith('/catalog')) {
     const nested = location.pathname !== '/catalog'
-    crumbs.push({ label: 'Главная', to: '/' }, nested ? { label: 'Каталог', to: '/catalog' } : { label: 'Каталог' })
+    crumbs.push({ label: t('crumb.home'), to: '/' }, nested ? { label: t('crumb.catalog'), to: '/catalog' } : { label: t('crumb.catalog') })
     if (location.pathname === '/catalog/new') {
-      crumbs.push({ label: 'Новая карточка' })
+      crumbs.push({ label: t('crumb.new') })
     } else if (location.pathname === '/catalog/network') {
-      crumbs.push({ label: 'Сеть связей' })
+      crumbs.push({ label: t('crumb.network') })
     } else if (cardId) {
       const read = readResourceCatalog(localStorage)
       const card = read.ok ? read.catalog.cards.find((item) => item.id === cardId) : undefined
-      crumbs.push({ label: card?.name.trim() || 'Карточка' })
+      crumbs.push({ label: card?.name.trim() || t('crumb.card') })
     }
   } else if (location.pathname.startsWith('/documents')) {
     crumbs.push({ label: 'Documents', to: '/documents' })

@@ -1,3 +1,4 @@
+import { catalogFailure, type CatalogMessageCode } from '../domain/catalog-message'
 import { emptyResourceCatalog, parseResourceCatalog, type CatalogRead, type ResourceCatalog } from '../domain/resource-catalog'
 
 export const resourceCatalogStorageKey = 'future-city.resource-catalog.v1'
@@ -12,7 +13,7 @@ export function readResourceCatalog(store: CatalogStore): CatalogRead {
   try {
     raw = store.getItem(resourceCatalogStorageKey)
   } catch {
-    return { ok: false, message: 'Не удалось прочитать каталог в этом браузере.' }
+    return catalogFailure('catalog.storage.read')
   }
   if (raw === null) {
     return { ok: true, catalog: emptyResourceCatalog() }
@@ -21,12 +22,12 @@ export function readResourceCatalog(store: CatalogStore): CatalogRead {
   try {
     parsed = JSON.parse(raw)
   } catch {
-    return { ok: false, message: 'Файл каталога не является корректным JSON.' }
+    return catalogFailure('catalog.storage.json')
   }
   return parseResourceCatalog(parsed)
 }
 
-export function writeResourceCatalog(store: CatalogStore, value: unknown): { ok: true; catalog: ResourceCatalog } | { ok: false; message: string } {
+export function writeResourceCatalog(store: CatalogStore, value: unknown): { ok: true; catalog: ResourceCatalog } | { ok: false; message: CatalogMessageCode } {
   const parsed = parseResourceCatalog(value)
   if (!parsed.ok) {
     return parsed
@@ -34,7 +35,7 @@ export function writeResourceCatalog(store: CatalogStore, value: unknown): { ok:
   try {
     store.setItem(resourceCatalogStorageKey, JSON.stringify(parsed.catalog))
   } catch {
-    return { ok: false, message: 'Не удалось сохранить каталог в этом браузере.' }
+    return catalogFailure('catalog.storage.write')
   }
   return parsed
 }

@@ -159,7 +159,7 @@ describe('resource catalog cards', () => {
     const parsed = parseResourceCatalog({ version: 1, cards: [draft], links: [] })
     expect(parsed.ok).toBe(false)
     if (!parsed.ok) {
-      expect(parsed.message).toBe('Измерение ссылается на исследование, которого нет в карточке.')
+      expect(parsed.message).toBe('quantity.missing-evidence')
     }
   })
 })
@@ -230,14 +230,14 @@ describe('resource catalog storage', () => {
 
   it('reports corrupt JSON and an unknown version without replacing stored text', () => {
     const corrupt = memoryStore({ [resourceCatalogStorageKey]: '{not json' })
-    expect(readResourceCatalog(corrupt)).toEqual({ ok: false, message: 'Файл каталога не является корректным JSON.' })
+    expect(readResourceCatalog(corrupt)).toEqual({ ok: false, message: 'catalog.storage.json' })
     expect(corrupt.data[resourceCatalogStorageKey]).toBe('{not json')
 
     const unknown = memoryStore({ [resourceCatalogStorageKey]: JSON.stringify({ version: 2, cards: [], links: [] }) })
     const read = readResourceCatalog(unknown)
     expect(read.ok).toBe(false)
     if (!read.ok) {
-      expect(read.message).toBe('Версия файла каталога не поддерживается.')
+      expect(read.message).toBe('catalog.version')
     }
     expect(unknown.data[resourceCatalogStorageKey]).toContain('"version":2')
   })

@@ -1,3 +1,4 @@
+import { catalogFailure, type CatalogMessageCode } from './catalog-message'
 import {
   parseResourceCatalog,
   type CatalogCard,
@@ -224,13 +225,13 @@ export function applyCardDraft(
   catalog: ResourceCatalog,
   draft: CardDraft,
   now: string,
-): { ok: true; catalog: ResourceCatalog } | { ok: false; message: string } {
+): { ok: true; catalog: ResourceCatalog } | { ok: false; message: CatalogMessageCode } {
   const evidence = draftEvidence(draft.evidence)
   if (!evidence.ok) {
     return evidence
   }
   const evidenceIds = new Set(evidence.evidence.map((item) => item.id))
-  const quantities = draftQuantities(draft.quantities, evidenceIds, 'measurement')
+  const quantities = draftQuantities(draft.quantities, evidenceIds)
   if (!quantities.ok) {
     return quantities
   }
@@ -284,18 +285,18 @@ export function applyCardDraft(
   return parseResourceCatalog({ version: 1, cards, links: links.links })
 }
 
-function draftEvidence(rows: readonly EvidenceDraft[]): { ok: true; evidence: Evidence[] } | { ok: false; message: string } {
+function draftEvidence(rows: readonly EvidenceDraft[]): { ok: true; evidence: Evidence[] } | { ok: false; message: CatalogMessageCode } {
   const evidence: Evidence[] = []
   for (const row of rows) {
     if (isBlankEvidence(row)) {
       continue
     }
-    const year = readOptionalNumber(row.yearText, 'the publication year')
+    const year = readOptionalNumber(row.yearText)
     if (!year.ok) {
       return year
     }
     if (year.value !== null && !Number.isInteger(year.value)) {
-      return { ok: false, message: 'Укажите целый год или оставьте поле пустым.' }
+      return catalogFailure('form.year')
     }
     evidence.push({
       id: row.id,
@@ -314,11 +315,10 @@ function draftEvidence(rows: readonly EvidenceDraft[]): { ok: true; evidence: Ev
 function draftQuantities(
   rows: readonly QuantityDraft[],
   evidenceIds: Set<string>,
-  label: string,
-): { ok: true; quantities: MeasuredQuantity[] } | { ok: false; message: string } {
+): { ok: true; quantities: MeasuredQuantity[] } | { ok: false; message: CatalogMessageCode } {
   const quantities: MeasuredQuantity[] = []
   for (const row of rows) {
-    const parsed = toQuantity(row, evidenceIds, label)
+    const parsed = toQuantity(row, evidenceIds)
     if (!parsed.ok) {
       return parsed
     }
@@ -332,7 +332,7 @@ function draftQuantities(
 function draftAccounts(
   draft: CardDraft,
   evidenceIds: Set<string>,
-): { ok: true; accounts?: ResourceAccounts } | { ok: false; message: string } {
+): { ok: true; accounts?: ResourceAccounts } | { ok: false; message: CatalogMessageCode } {
   const accounts: ResourceAccounts = { regional: [] }
   const fields = [
     ['physicalAbundance', draft.physicalAbundance],
@@ -341,7 +341,7 @@ function draftAccounts(
     ['supplyDeficit', draft.supplyDeficit],
   ] as const
   for (const [field, row] of fields) {
-    const parsed = toQuantity(row, evidenceIds, field)
+    const parsed = toQuantity(row, evidenceIds)
     if (!parsed.ok) {
       return parsed
     }
@@ -350,8 +350,8 @@ function draftAccounts(
     }
   }
   for (const region of draft.regional) {
-    const availability = toQuantity(region.availability, evidenceIds, 'regional availability')
-    const supplyDeficit = toQuantity(region.supplyDeficit, evidenceIds, 'regional supply deficit')
+    const availability = toQuantity(region.availability, evidenceIds)
+    const supplyDeficit = toQuantity(region.supplyDeficit, evidenceIds)
     if (!availability.ok) {
       return availability
     }
@@ -378,7 +378,7 @@ function draftAccounts(
 function draftSource(
   draft: CardDraft,
   evidenceIds: Set<string>,
-): { ok: true; profile?: SourceProfile } | { ok: false; message: string } {
+): { ok: true; profile?: SourceProfile } | { ok: false; message: CatalogMessageCode } {
   const profile: SourceProfile = {}
   const fields = [
     ['productionVolume', draft.productionVolume],
@@ -389,7 +389,7 @@ function draftSource(
     ['footprint', draft.footprint],
   ] as const
   for (const [field, row] of fields) {
-    const parsed = toQuantity(row, evidenceIds, field)
+    const parsed = toQuantity(row, evidenceIds)
     if (!parsed.ok) {
       return parsed
     }
@@ -413,7 +413,7 @@ function draftSource(
 function draftConsumer(
   draft: CardDraft,
   evidenceIds: Set<string>,
-): { ok: true; profile?: ConsumerProfile } | { ok: false; message: string } {
+): { ok: true; profile?: ConsumerProfile } | { ok: false; message: CatalogMessageCode } {
   const profile: ConsumerProfile = {}
   const fields = [
     ['quantityUsed', draft.quantityUsed],
@@ -421,7 +421,7 @@ function draftConsumer(
     ['averageLoad', draft.averageLoad],
   ] as const
   for (const [field, row] of fields) {
-    const parsed = toQuantity(row, evidenceIds, field)
+    const parsed = toQuantity(row, evidenceIds)
     if (!parsed.ok) {
       return parsed
     }
@@ -436,7 +436,7 @@ function draftConsumer(
     byproducts: draft.byproducts,
   })
   if (draft.servedText.trim()) {
-    const served = readOptionalNumber(draft.servedText, 'the number served')
+    const served = readOptionalNumber(draft.servedText)
     if (!served.ok) {
       return served
     }
@@ -450,7 +450,7 @@ function draftConsumer(
   return { ok: true, profile }
 }
 
-function linksForDraft(catalog: ResourceCatalog, draft: CardDraft): { ok: true; links: CatalogLink[] } | { ok: false; message: string } {
+function linksForDraft(catalog: ResourceCatalog, draft: CardDraft): { ok: true; links: CatalogLink[] } | { ok: false; message: CatalogMessageCode } {
   const kept = catalog.links.filter((link) => {
     if (link.role === 'produces') {
       return link.sourceId !== draft.id
@@ -462,7 +462,7 @@ function linksForDraft(catalog: ResourceCatalog, draft: CardDraft): { ok: true; 
   for (const resourceId of resourceIds) {
     const resource = catalog.cards.find((card) => card.id === resourceId)
     if (!resource || resource.kind !== 'resource') {
-      return { ok: false, message: 'Выберите карточку ресурса, которая есть в каталоге.' }
+      return catalogFailure('form.resource')
     }
     if (draft.kind === 'source') {
       const previous = catalog.links.find((link) => link.role === 'produces' && link.sourceId === draft.id && link.resourceId === resourceId)
@@ -479,12 +479,11 @@ function linksForDraft(catalog: ResourceCatalog, draft: CardDraft): { ok: true; 
 function toQuantity(
   draft: QuantityDraft,
   evidenceIds: Set<string>,
-  label: string,
-): { ok: true; quantity?: MeasuredQuantity } | { ok: false; message: string } {
+): { ok: true; quantity?: MeasuredQuantity } | { ok: false; message: CatalogMessageCode } {
   if (isBlankQuantity(draft)) {
     return { ok: true }
   }
-  const amount = readOptionalNumber(draft.valueText, label)
+  const amount = readOptionalNumber(draft.valueText)
   if (!amount.ok) {
     return amount
   }
@@ -551,14 +550,14 @@ function isBlankEvidence(draft: EvidenceDraft): boolean {
   return [draft.title, draft.author, draft.yearText, draft.url, draft.supports].every((value) => value.trim() === '')
 }
 
-function readOptionalNumber(text: string, label: string): { ok: true; value: number | null } | { ok: false; message: string } {
+function readOptionalNumber(text: string): { ok: true; value: number | null } | { ok: false; message: CatalogMessageCode } {
   const trimmed = text.trim()
   if (!trimmed) {
     return { ok: true, value: null }
   }
   const value = Number(trimmed)
   if (!Number.isFinite(value)) {
-    return { ok: false, message: `Введите число для «${label}» или оставьте поле пустым.` }
+    return catalogFailure('form.number')
   }
   return { ok: true, value }
 }
