@@ -12,7 +12,7 @@ export function readResourceCatalog(store: CatalogStore): CatalogRead {
   try {
     raw = store.getItem(resourceCatalogStorageKey)
   } catch {
-    return { ok: false, message: 'The resource catalog could not be read from this browser.' }
+    return { ok: false, message: 'Не удалось прочитать каталог в этом браузере.' }
   }
   if (raw === null) {
     return { ok: true, catalog: emptyResourceCatalog() }
@@ -21,7 +21,7 @@ export function readResourceCatalog(store: CatalogStore): CatalogRead {
   try {
     parsed = JSON.parse(raw)
   } catch {
-    return { ok: false, message: 'The resource catalog is not valid JSON.' }
+    return { ok: false, message: 'Файл каталога не является корректным JSON.' }
   }
   return parseResourceCatalog(parsed)
 }
@@ -34,7 +34,7 @@ export function writeResourceCatalog(store: CatalogStore, value: unknown): { ok:
   try {
     store.setItem(resourceCatalogStorageKey, JSON.stringify(parsed.catalog))
   } catch {
-    return { ok: false, message: 'The resource catalog could not be saved in this browser.' }
+    return { ok: false, message: 'Не удалось сохранить каталог в этом браузере.' }
   }
   return parsed
 }

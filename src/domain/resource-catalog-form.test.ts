@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { emptyResourceCatalog } from './resource-catalog'
+import { emptyResourceCatalog, parseResourceCatalog } from './resource-catalog'
 import { applyCardDraft, cardToDraft, createCardDraft, removeEvidenceDraft, type QuantityDraft } from './resource-catalog-form'
 
 const now = '2026-11-01T12:00:00.000Z'
@@ -135,7 +135,73 @@ describe('resource catalog card draft', () => {
     const applied = applyCardDraft(emptyResourceCatalog(), draft, now)
     expect(applied.ok).toBe(false)
     if (!applied.ok) {
-      expect(applied.message).toBe('Choose a resource card that exists.')
+      expect(applied.message).toBe('Выберите карточку ресурса, которая есть в каталоге.')
     }
+  })
+
+  it('keeps several characteristics and drops a saved city or region', () => {
+    const parsed = parseResourceCatalog({
+      version: 1,
+      cards: [{
+        id: 'card:water',
+        kind: 'resource',
+        name: 'Fresh water',
+        category: 'water',
+        summary: 'A municipal definition',
+        status: 'draft',
+        scarcity: 'unknown',
+        priority: 'P3',
+        createdAt: now,
+        updatedAt: now,
+        cityId: 'city:aurora',
+        regionId: 'region:basin',
+        regionLabel: 'Example basin',
+        quantities: [
+          { id: 'qty:density', name: 'Density', value: null, unit: 'kg/m3', quantityKind: 'density', aspect: 'property', evidenceId: 'evidence:survey' },
+          { id: 'qty:ph', name: 'pH', value: null, unit: '', quantityKind: 'count', aspect: 'quality' },
+        ],
+        evidence: [{
+          id: 'evidence:survey',
+          title: 'Basin survey',
+          author: 'City water office',
+          year: 2024,
+          url: null,
+          studyType: 'study',
+          supports: 'Density',
+          verification: 'unreviewed',
+        }],
+        accounts: { regional: [] },
+      }],
+      links: [],
+    })
+    expect(parsed.ok).toBe(true)
+    if (!parsed.ok) {
+      return
+    }
+    const stored = parsed.catalog.cards[0]
+    expect(stored).not.toHaveProperty('cityId')
+    expect(stored?.quantities).toHaveLength(2)
+    expect(stored?.evidence[0]?.title).toBe('Basin survey')
+    const draft = cardToDraft(stored!, parsed.catalog.links)
+    draft.quantities.push({
+      ...draft.quantities[0]!,
+      id: 'qty:limit',
+      name: 'pH limit',
+      valueText: '',
+      aspect: 'requirement',
+      evidenceId: 'evidence:survey',
+    })
+    const applied = applyCardDraft(parsed.catalog, draft, now)
+    expect(applied.ok).toBe(true)
+    if (!applied.ok) {
+      return
+    }
+    const saved = applied.catalog.cards[0]
+    expect(saved).not.toHaveProperty('cityId')
+    expect(saved).not.toHaveProperty('regionId')
+    expect(saved?.quantities.map((item) => item.aspect)).toEqual(['property', 'quality', 'requirement'])
+    expect(saved?.quantities.filter((item) => item.evidenceId === 'evidence:survey')).toHaveLength(2)
+    expect(saved?.quantities[0]?.value).toBeNull()
+    expect(saved?.evidence).toHaveLength(1)
   })
 })

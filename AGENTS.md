@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-NeoTerraProject (package `future-city`, product name Future City) is a browser research model of a resource-based city and planet. It connects planetary resource layers, city layouts, objects, systems, documents, and tasks. The interface is English. One id is meant to identify the same thing in the mesh, the inspector, a system membership, and a flow endpoint.
+NeoTerraProject (package `future-city`, product name Future City) is a browser research model of a resource-based city and planet. It connects planetary resource layers, city layouts, objects, systems, documents, and tasks. The city and planet interface is English. The resource catalog pages are Russian. One id is meant to identify the same thing in the mesh, the inspector, a system membership, and a flow endpoint.
 
 ## Architecture
 
@@ -47,9 +47,9 @@ Defined in `src/domain/types.ts`.
 
 Demo cities Aurora (`city:aurora`) and Meridian (`city:meridian`) stay in the demo snapshot. They do not receive automatic rates or tutorial writes.
 
-Resource catalog cards are global records, not city objects. One card has `kind`: `resource`, `source`, or `consumer`. Shared fields include status, scarcity, and priority. Scarcity is a supply classification. It is separate from physical abundance, total reserves, recoverable reserves, regional availability, and supply deficit. Those accounts are optional measurements. A missing number is `null`.
+Resource catalog cards are universal records, not city objects and not instances placed in a city. One card has `kind`: `resource`, `source`, or `consumer`. A source and a consumer are separate cards today. A later city instance may both produce and consume; that does not require a new card kind now. Shared fields include status, scarcity, and priority. Scarcity is a supply classification. It is separate from physical abundance, total reserves, recoverable reserves, and supply deficit. Those accounts are optional measurements. A missing number is `null`. A card does not store a city id, a region id, or a region label. A saved file that still has those fields is read, and the next save omits them. Measurements inside an old regional record stay. The place names do not.
 
-`quantityKind` is a closed set: `mass`, `volume`, `density`, `power`, `energy`, `productionRate`, `consumptionRate`, `reserve`, `area`, `count`, `efficiency`. Power and energy are different kinds. A stock and a rate are different kinds. There is no unit converter. Optional `measuredAt`, `periodStart`, `periodEnd`, `conditions`, and `evidenceId` sit on a measurement.
+`quantityKind` is a closed set: `mass`, `volume`, `density`, `power`, `energy`, `productionRate`, `consumptionRate`, `reserve`, `area`, `count`, `efficiency`. Power and energy are different kinds. A stock and a rate are different kinds. There is no unit converter. Optional `measuredAt`, `periodStart`, `periodEnd`, `conditions`, `evidenceId`, and `aspect` sit on a measurement. `aspect` is `property`, `quality`, `requirement`, `metric`, or `operation`. A missing aspect stays a quantitative metric. A requirement is one recorded value, not a numeric range.
 
 Evidence records have their own ids. A measurement may cite one of them. A draft may have an empty evidence list. Source-only and consumer-only fields live in `sourceProfile` and `consumerProfile`.
 
@@ -86,9 +86,9 @@ The working tree may contain edits outside a catalog commit. Do not fold unrelat
 ## Technical Decisions
 
 - Keep city layout storage, planet feed cache, and the resource card catalog in separate versioned keys. The layout parser rejects unknown shapes, so catalog cards do not belong in `future-city.layouts.v1`. A link that cites a missing card is rejected rather than stored.
-- Do not reuse `ResourceType` or `ResourceFlow` as the universal card. Those types are city-flow records. A global card needs its own id and optional links to a city id later.
+- Do not reuse `ResourceType` or `ResourceFlow` as the universal card. Those types are city-flow records. A universal card has its own id. A city instance, when one exists, points at that card and keeps location, stock, and actual performance for itself.
 - Catalog search, filters, and sorting are pure functions. Kind, text, category, scarcity, priority, and status apply together. Text matches name, summary, category, and subcategory.
-- The card form keeps an editing draft and writes a catalog card on save. An empty numeric field stays `null` or omitted. Deleting evidence clears measurement references to that id. A URL does not set verification. The form shows name, category, description, status, priority, and scarcity first. Location and image stay in a closed section. Studies are entered once and chosen as a measurement's data source. Extra measurement fields stay closed until opened. Each named account still holds one measurement; several measurements of one kind go in the measurement list.
+- The card form keeps an editing draft and writes a catalog card on save. An empty numeric field stays `null` or omitted. Deleting evidence clears measurement references to that id. A URL does not set verification. The catalog UI is Russian. The form shows name, category, description, status, priority, and scarcity first. Image stays in a closed section. Studies are entered once and chosen as a measurement's data source. Extra measurement fields stay closed until opened. Characteristics are added by group: property, quality or requirement, metric, and operation. Each named account still holds one measurement; several measurements of one kind go in the measurement list.
 - Produces and uses links stay the catalog link records. The network page adds and deletes those records through the same parser and storage key. Replacing a connection is a delete followed by an add. Missing or wrong-kind links and duplicate endpoint pairs are errors. A card with no connection is a warning, and the page does not delete it. The graph is plain SVG in three columns. Above 18 visible nodes it asks for a focus before drawing.
 - Absence of a measurement is not zero. Priority is not scarcity. A stock is not a replenishment rate. Power (kW) is not energy (kWh).
 - Do not invent scientific numbers. A demo value must be labeled demo. A link is not verification.
@@ -104,6 +104,6 @@ The working tree may contain edits outside a catalog commit. Do not fold unrelat
 
 ## Next Steps
 
-Stage 4 is in place: `/catalog/network`, `src/domain/resource-network.ts`, and `src/features/catalog/CatalogNetworkPage.tsx`. The card form layout is the compact entry screen in `src/features/catalog/CatalogCardPage.tsx`.
+The catalog is a universal library. City placement, actual stock, and current performance stay out of the card. The compact Russian form is `src/features/catalog/CatalogCardPage.tsx`.
 
-Stop here. Do not start a later catalog stage unless a new task asks for it. Do not seed scientific examples.
+Stop here. Do not start a city-instance catalog stage unless a new task asks for it. Do not seed scientific examples.

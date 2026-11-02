@@ -30,6 +30,10 @@ export const quantityKinds = [
 
 export type QuantityKind = (typeof quantityKinds)[number]
 
+export const characteristicAspects = ['property', 'quality', 'requirement', 'metric', 'operation'] as const
+
+export type CharacteristicAspect = (typeof characteristicAspects)[number]
+
 export type EvidenceStudyType =
   | 'paper'
   | 'government-statistics'
@@ -61,12 +65,11 @@ export type MeasuredQuantity = {
   periodEnd?: string
   conditions?: string
   evidenceId?: string
+  aspect?: CharacteristicAspect
 }
 
 export type RegionalAvailability = {
   id: string
-  regionId?: string
-  regionLabel?: string
   availability?: MeasuredQuantity
   supplyDeficit?: MeasuredQuantity
 }
@@ -120,9 +123,6 @@ export type CatalogCard = {
   priority: Priority
   createdAt: string
   updatedAt: string
-  cityId?: string
-  regionId?: string
-  regionLabel?: string
   quantities: MeasuredQuantity[]
   evidence: Evidence[]
   accounts?: ResourceAccounts
@@ -177,7 +177,7 @@ export function parseResourceCatalog(value: unknown): CatalogRead {
     return { ok: false, message: 'The resource catalog file is not an object.' }
   }
   if (value.version !== resourceCatalogVersion) {
-    return { ok: false, message: 'The resource catalog version is not supported.' }
+    return { ok: false, message: 'Версия файла каталога не поддерживается.' }
   }
   if (!Array.isArray(value.cards) || !Array.isArray(value.links)) {
     return { ok: false, message: 'The resource catalog is missing cards or links.' }
@@ -258,10 +258,8 @@ function parseCard(value: unknown): { ok: true; card: CatalogCard } | { ok: fals
     return image
   }
   const subcategory = readOptionalString(value, 'subcategory')
-  const cityId = readOptionalString(value, 'cityId')
-  const regionId = readOptionalString(value, 'regionId')
-  const regionLabel = readOptionalString(value, 'regionLabel')
-  if (!subcategory.ok || !cityId.ok || !regionId.ok || !regionLabel.ok) {
+  const legacyPlace = [readOptionalString(value, 'cityId'), readOptionalString(value, 'regionId'), readOptionalString(value, 'regionLabel')]
+  if (!subcategory.ok || legacyPlace.some((field) => !field.ok)) {
     return { ok: false, message: 'A catalog card has a text field that is not a string.' }
   }
   const card: CatalogCard = {
@@ -280,9 +278,6 @@ function parseCard(value: unknown): { ok: true; card: CatalogCard } | { ok: fals
   }
   assignOptional(card, {
     subcategory: subcategory.value,
-    cityId: cityId.value,
-    regionId: regionId.value,
-    regionLabel: regionLabel.value,
     image: image.image,
     accounts: accounts.accounts,
     sourceProfile: sourceProfile.profile,
@@ -411,7 +406,10 @@ function parseQuantity(value: unknown, evidenceIds: Set<string>): { ok: true; qu
     return { ok: false, message: 'A measurement has a text field that is not a string.' }
   }
   if (evidenceId.value !== undefined && !evidenceIds.has(evidenceId.value)) {
-    return { ok: false, message: 'A measurement cites evidence that is not on this card.' }
+    return { ok: false, message: 'Измерение ссылается на исследование, которого нет в карточке.' }
+  }
+  if ('aspect' in value && value.aspect !== undefined && !isCharacteristicAspect(value.aspect)) {
+    return { ok: false, message: 'A measurement has a characteristic group that is not supported.' }
   }
   const quantity: MeasuredQuantity = { id, name, value: amount, unit, quantityKind: value.quantityKind }
   assignOptional(quantity, {
@@ -420,6 +418,7 @@ function parseQuantity(value: unknown, evidenceIds: Set<string>): { ok: true; qu
     periodEnd: periodEnd.value,
     conditions: conditions.value,
     evidenceId: evidenceId.value,
+    aspect: isCharacteristicAspect(value.aspect) ? value.aspect : undefined,
   })
   return { ok: true, quantity }
 }
@@ -476,8 +475,6 @@ function parseRegion(value: unknown, evidenceIds: Set<string>): { ok: true; regi
   }
   const region: RegionalAvailability = { id }
   assignOptional(region, {
-    regionId: regionId.value,
-    regionLabel: regionLabel.value,
     availability: availability.quantity,
     supplyDeficit: supplyDeficit.quantity,
   })
@@ -644,6 +641,10 @@ function isPriority(value: unknown): value is Priority {
 
 function isQuantityKind(value: unknown): value is QuantityKind {
   return typeof value === 'string' && (quantityKinds as readonly string[]).includes(value)
+}
+
+function isCharacteristicAspect(value: unknown): value is CharacteristicAspect {
+  return typeof value === 'string' && (characteristicAspects as readonly string[]).includes(value)
 }
 
 function isStudyType(value: unknown): value is EvidenceStudyType {

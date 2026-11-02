@@ -13,7 +13,7 @@ import {
   type NetworkKindFilter,
   type NetworkQuery,
 } from '../../domain/resource-network'
-import { catalogKindLabels } from '../../domain/resource-catalog-view'
+import { catalogKindLabels, catalogLinkRoleLabels } from '../../domain/resource-catalog-view'
 import { EmptyState, ErrorState } from '../../shared/ui/Status'
 import controls from '../../shared/ui/controls.module.css'
 import styles from './CatalogNetworkPage.module.css'
@@ -36,7 +36,7 @@ export function CatalogNetworkPage() {
   const [message, setMessage] = useState<string | undefined>()
 
   if (!stored.ok) {
-    return <ErrorState title="The resource catalog could not be read" detail={stored.message} />
+    return <ErrorState title="Каталог не удалось прочитать" detail={stored.message} />
   }
   const catalog = stored.catalog
   const network = resourceNetwork(catalog, query)
@@ -73,69 +73,69 @@ export function CatalogNetworkPage() {
     <div className={styles.page}>
       <header className={styles.heading}>
         <div>
-          <h1>Resource Network</h1>
-          <p className={controls.muted}>Sources, resources, and consumers, and the produces and uses connections between them. A connection does not record a flow or a balance.</p>
+          <h1>Сеть связей</h1>
+          <p className={controls.muted}>Источники, ресурсы и потребители и связи produces и uses между ними. Связь не записывает поток и не считает баланс.</p>
         </div>
-        <Link className={controls.ghost} to="/catalog">Back to catalog</Link>
+        <Link className={controls.ghost} to="/catalog">К каталогу</Link>
       </header>
-      <div className={styles.actions} role="group" aria-label="Network view">
-        <button className={controls.toggle} type="button" aria-pressed={view === 'graph'} onClick={() => setView('graph')}>Graph</button>
-        <button className={controls.toggle} type="button" aria-pressed={view === 'list'} onClick={() => setView('list')}>List</button>
+      <div className={styles.actions} role="group" aria-label="Вид сети">
+        <button className={controls.toggle} type="button" aria-pressed={view === 'graph'} onClick={() => setView('graph')}>Граф</button>
+        <button className={controls.toggle} type="button" aria-pressed={view === 'list'} onClick={() => setView('list')}>Список</button>
       </div>
       <div className={styles.filters}>
-        <label className={controls.stack}>Search<input className={controls.field} value={query.text} onChange={(event) => update({ text: event.target.value })} placeholder="Card name" /></label>
+        <label className={controls.stack}>Поиск<input className={controls.field} value={query.text} onChange={(event) => update({ text: event.target.value })} placeholder="Название карточки" /></label>
         <label className={controls.stack}>
-          Node type
+          Тип узла
           <select className={controls.select} value={query.kind} onChange={(event) => update({ kind: event.target.value as NetworkKindFilter })}>
-            <option value="all">All types</option>
-            <option value="resource">Resources</option>
-            <option value="source">Sources</option>
-            <option value="consumer">Consumers</option>
+            <option value="all">Все типы</option>
+            <option value="resource">Ресурсы</option>
+            <option value="source">Источники</option>
+            <option value="consumer">Потребители</option>
           </select>
         </label>
         <label className={controls.stack}>
-          Focus
+          Фокус
           <select className={controls.select} value={query.focusId} onChange={(event) => update({ focusId: event.target.value })}>
-            <option value="">Whole network</option>
-            {catalog.cards.map((card) => <option key={card.id} value={card.id}>{catalogKindLabels[card.kind]} · {card.name.trim() || 'Untitled'}</option>)}
+            <option value="">Вся сеть</option>
+            {catalog.cards.map((card) => <option key={card.id} value={card.id}>{catalogKindLabels[card.kind]} · {card.name.trim() || 'Без названия'}</option>)}
           </select>
         </label>
         <label className={controls.stack}>
-          Connections
+          Связи
           <select className={controls.select} value={query.connection} onChange={(event) => update({ connection: event.target.value as NetworkConnectionFilter })}>
-            <option value="all">All cards</option>
-            <option value="connected">Connected cards</option>
-            <option value="unconnected">Cards with no connections</option>
+            <option value="all">Все карточки</option>
+            <option value="connected">Со связями</option>
+            <option value="unconnected">Без связей</option>
           </select>
         </label>
       </div>
       <section className={styles.row}>
         <label className={controls.stack}>
-          Connection
+          Связь
           <select className={controls.select} value={role} onChange={(event) => { setRole(event.target.value as 'produces' | 'uses'); setFromId('') }}>
-            <option value="produces">Source produces resource</option>
-            <option value="uses">Consumer uses resource</option>
+            <option value="produces">Источник производит ресурс</option>
+            <option value="uses">Потребитель использует ресурс</option>
           </select>
         </label>
         <label className={controls.stack}>
-          {role === 'produces' ? 'Source' : 'Consumer'}
+          {role === 'produces' ? 'Источник' : 'Потребитель'}
           <select className={controls.select} value={fromId} onChange={(event) => setFromId(event.target.value)}>
-            <option value="">Choose a card</option>
-            {fromCards.map((card) => <option key={card.id} value={card.id}>{card.name.trim() || 'Untitled'}</option>)}
+            <option value="">Выберите карточку</option>
+            {fromCards.map((card) => <option key={card.id} value={card.id}>{card.name.trim() || 'Без названия'}</option>)}
           </select>
         </label>
         <label className={controls.stack}>
-          Resource
+          Ресурс
           <select className={controls.select} value={resourceId} onChange={(event) => setResourceId(event.target.value)}>
-            <option value="">Choose a resource</option>
-            {resources.map((card) => <option key={card.id} value={card.id}>{card.name.trim() || 'Untitled'}</option>)}
+            <option value="">Выберите ресурс</option>
+            {resources.map((card) => <option key={card.id} value={card.id}>{card.name.trim() || 'Без названия'}</option>)}
           </select>
         </label>
-        <button className={controls.button} type="button" onClick={createConnection} disabled={!fromId || !resourceId}>Add connection</button>
+        <button className={controls.button} type="button" onClick={createConnection} disabled={!fromId || !resourceId}>Добавить связь</button>
       </section>
       {message ? <p className={controls.error} role="alert">{message}</p> : null}
       {network.notices.length > 0 ? (
-        <section className={styles.notices} aria-label="Connection checks">
+        <section className={styles.notices} aria-label="Проверка связей">
           {network.notices.map((notice) => (
             <p key={`${notice.code}-${notice.linkId ?? notice.cardId}`} className={notice.level === 'error' ? controls.error : styles.warning}>{notice.message}</p>
           ))}
@@ -160,10 +160,10 @@ export function CatalogNetworkPage() {
 
 function NetworkGraph({ nodes, links, focusId, narrowed, onOpen }: { nodes: CatalogCard[]; links: CatalogLink[]; focusId: string; narrowed: boolean; onOpen: (id: string) => void }) {
   if (nodes.length === 0) {
-    return <EmptyState title={narrowed ? 'No cards to show' : 'No connections yet'} detail={narrowed ? 'No saved card matches this search and these filters.' : 'Add a produces or uses connection between saved cards. A card without a connection is not an error.'} />
+    return <EmptyState title={narrowed ? 'Нет карточек' : 'Связей пока нет'} detail={narrowed ? 'Сохранённые карточки не подходят под поиск и фильтры.' : 'Добавьте связь produces или uses. Карточка без связи — это не ошибка.'} />
   }
   if (graphNeedsFocus(nodes.length, focusId)) {
-    return <EmptyState title="Choose a focus" detail="This network has many cards. Choose a resource, source, or consumer to draw its connections." />
+    return <EmptyState title="Выберите фокус" detail="В сети много карточек. Выберите ресурс, источник или потребителя, чтобы нарисовать его связи." />
   }
   const grouped = {
     source: nodes.filter((card) => card.kind === 'source').sort(byName),
@@ -174,8 +174,8 @@ function NetworkGraph({ nodes, links, focusId, narrowed, onOpen }: { nodes: Cata
   const drawn = new Set<string>()
   return (
     <div className={styles.graph}>
-      {links.length === 0 ? <p className={controls.muted}>No connections yet. Cards without a connection are not an error.</p> : null}
-      <svg viewBox={`0 0 820 ${height}`} role="img" aria-label="Resource network">
+      {links.length === 0 ? <p className={controls.muted}>Связей пока нет. Карточка без связи — это не ошибка.</p> : null}
+      <svg viewBox={`0 0 820 ${height}`} role="img" aria-label="Сеть связей">
         <defs>
           <marker id="arrow-produces" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#4c88d8" /></marker>
           <marker id="arrow-uses" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#e0923a" /></marker>
@@ -206,7 +206,7 @@ function NetworkGraph({ nodes, links, focusId, narrowed, onOpen }: { nodes: Cata
           return (
             <g key={key}>
               <line x1={x1} y1={y1} x2={x2 - 8} y2={y2} stroke={link.role === 'produces' ? '#4c88d8' : '#e0923a'} strokeWidth="1.5" markerEnd={link.role === 'produces' ? 'url(#arrow-produces)' : 'url(#arrow-uses)'} />
-              <text className={styles.kind} x={(x1 + x2) / 2} y={(y1 + y2) / 2 - 4} textAnchor="middle">{link.role}</text>
+              <text className={styles.kind} x={(x1 + x2) / 2} y={(y1 + y2) / 2 - 4} textAnchor="middle">{catalogLinkRoleLabels[link.role]}</text>
             </g>
           )
         })}
@@ -219,7 +219,7 @@ function NetworkGraph({ nodes, links, focusId, narrowed, onOpen }: { nodes: Cata
 }
 
 function GraphNode({ card, x, y, onOpen }: { card: CatalogCard; x: number; y: number; onOpen: (id: string) => void }) {
-  const name = card.name.trim() || 'Untitled'
+  const name = card.name.trim() || 'Без названия'
   return (
     <g role="link" tabIndex={0} onClick={() => onOpen(card.id)} onKeyDown={(event) => { if (event.key === 'Enter') onOpen(card.id) }}>
       <rect className={`${styles.node} ${styles[card.kind]}`} x={x} y={y} width={nodeWidth} height={nodeHeight} rx="8" />
@@ -231,21 +231,21 @@ function GraphNode({ card, x, y, onOpen }: { card: CatalogCard; x: number; y: nu
 
 function ConnectionList({ catalog, nodes, links, narrowed, onSelect, onDelete }: { catalog: ResourceCatalog; nodes: CatalogCard[]; links: CatalogLink[]; narrowed: boolean; onSelect: (id: string) => void; onDelete: (linkId: string) => void }) {
   if (links.length === 0 && nodes.length === 0) {
-    return <EmptyState title={narrowed ? 'No cards to show' : 'No connections yet'} detail={narrowed ? 'No saved card matches this search and these filters.' : 'Add a produces or uses connection between saved cards. A card without a connection is not an error.'} />
+    return <EmptyState title={narrowed ? 'Нет карточек' : 'Связей пока нет'} detail={narrowed ? 'Сохранённые карточки не подходят под поиск и фильтры.' : 'Добавьте связь produces или uses. Карточка без связи — это не ошибка.'} />
   }
   if (links.length === 0) {
     return (
       <ul className={styles.list}>
         {nodes.map((card) => (
           <li key={card.id} className={styles.row}>
-            <button className={controls.ghost} type="button" onClick={() => onSelect(card.id)}>{card.name.trim() || 'Untitled'}</button>
+            <button className={controls.ghost} type="button" onClick={() => onSelect(card.id)}>{card.name.trim() || 'Без названия'}</button>
             <span>{catalogKindLabels[card.kind]}</span>
           </li>
         ))}
       </ul>
     )
   }
-  const nameOf = (id: string) => catalog.cards.find((card) => card.id === id)?.name.trim() || 'Missing card'
+  const nameOf = (id: string) => catalog.cards.find((card) => card.id === id)?.name.trim() || 'Нет карточки'
   return (
     <ul className={styles.list}>
       {links.map((link) => {
@@ -253,9 +253,9 @@ function ConnectionList({ catalog, nodes, links, narrowed, onSelect, onDelete }:
         return (
           <li key={link.id} className={styles.row}>
             <button className={controls.ghost} type="button" onClick={() => onSelect(ends.fromId)}>{nameOf(ends.fromId)}</button>
-            <span>{link.role}</span>
+            <span>{catalogLinkRoleLabels[link.role]}</span>
             <button className={controls.ghost} type="button" onClick={() => onSelect(ends.toId)}>{nameOf(ends.toId)}</button>
-            <button className={controls.ghost} type="button" onClick={() => onDelete(link.id)}>Delete connection</button>
+            <button className={controls.ghost} type="button" onClick={() => onDelete(link.id)}>Удалить связь</button>
           </li>
         )
       })}
@@ -268,11 +268,11 @@ function NodePanel({ card }: { card: CatalogCard }) {
   return (
     <section className={styles.panel}>
       <div>
-        <strong>{card.name.trim() || 'Untitled'}</strong>
-        <p className={controls.muted}>{catalogKindLabels[card.kind]}. These figures are stored on the card. The connection does not record output, consumption, or whether supply is adequate.</p>
-        {lines.length === 0 ? <p className={controls.muted}>No related measurements on this card.</p> : lines.map((line) => <p key={line}>{line}</p>)}
+        <strong>{card.name.trim() || 'Без названия'}</strong>
+        <p className={controls.muted}>{catalogKindLabels[card.kind]}. Эти величины записаны в карточке. Связь не хранит выпуск, потребление и достаточность снабжения.</p>
+        {lines.length === 0 ? <p className={controls.muted}>В карточке нет связанных величин.</p> : lines.map((line) => <p key={line}>{line}</p>)}
       </div>
-      <Link className={controls.button} to={`/catalog/${card.id}`}>Open card</Link>
+      <Link className={controls.button} to={`/catalog/${card.id}`}>Открыть карточку</Link>
     </section>
   )
 }

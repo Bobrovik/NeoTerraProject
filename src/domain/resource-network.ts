@@ -41,18 +41,18 @@ export function inspectResourceNetwork(catalog: ResourceCatalog): NetworkNotice[
     const ends = linkEnds(link)
     const key = `${link.role}:${ends.fromId}:${ends.toId}`
     if (seen.has(key)) {
-      notices.push({ level: 'error', code: 'duplicate', message: 'A connection with the same cards and role is stored more than once.', linkId: link.id })
+      notices.push({ level: 'error', code: 'duplicate', message: 'Одинаковая связь сохранена больше одного раза.', linkId: link.id })
     }
     seen.add(key)
     const from = byId.get(ends.fromId)
     const to = byId.get(ends.toId)
     if (!from || !to) {
-      notices.push({ level: 'error', code: 'missing-card', message: 'A connection cites a card that is not in the catalog.', linkId: link.id })
+      notices.push({ level: 'error', code: 'missing-card', message: 'Связь ссылается на карточку, которой нет в каталоге.', linkId: link.id })
       continue
     }
     const valid = link.role === 'produces' ? from.kind === 'source' && to.kind === 'resource' : from.kind === 'consumer' && to.kind === 'resource'
     if (!valid) {
-      notices.push({ level: 'error', code: 'wrong-kind', message: 'A connection joins card types that cannot be linked that way.', linkId: link.id })
+      notices.push({ level: 'error', code: 'wrong-kind', message: 'Связь соединяет типы карточек, которые так соединять нельзя.', linkId: link.id })
       continue
     }
     if (link.role === 'produces') {
@@ -66,16 +66,16 @@ export function inspectResourceNetwork(catalog: ResourceCatalog): NetworkNotice[
 
   for (const card of catalog.cards) {
     if (card.kind === 'source' && !sourcesWithOutput.has(card.id)) {
-      notices.push({ level: 'warning', code: 'source-unlinked', message: `${label(card)} has no produced resource.`, cardId: card.id })
+      notices.push({ level: 'warning', code: 'source-unlinked', message: `У «${label(card)}» нет производимого ресурса.`, cardId: card.id })
     }
     if (card.kind === 'consumer' && !consumersWithUse.has(card.id)) {
-      notices.push({ level: 'warning', code: 'consumer-unlinked', message: `${label(card)} has no resource it uses.`, cardId: card.id })
+      notices.push({ level: 'warning', code: 'consumer-unlinked', message: `«${label(card)}» не использует ресурс.`, cardId: card.id })
     }
     if (card.kind === 'resource' && !produced.has(card.id)) {
-      notices.push({ level: 'warning', code: 'resource-no-source', message: `${label(card)} has no source.`, cardId: card.id })
+      notices.push({ level: 'warning', code: 'resource-no-source', message: `У «${label(card)}» нет источника.`, cardId: card.id })
     }
     if (card.kind === 'resource' && !used.has(card.id)) {
-      notices.push({ level: 'warning', code: 'resource-no-consumer', message: `${label(card)} has no consumer.`, cardId: card.id })
+      notices.push({ level: 'warning', code: 'resource-no-consumer', message: `У «${label(card)}» нет потребителя.`, cardId: card.id })
     }
   }
   return notices
@@ -125,20 +125,20 @@ export function addCatalogLink(
   const resource = catalog.cards.find((card) => card.id === input.resourceId)
   const from = catalog.cards.find((card) => card.id === fromId)
   if (!resource || resource.kind !== 'resource' || !from) {
-    return { ok: false, message: 'Choose cards that exist in the catalog.' }
+    return { ok: false, message: 'Выберите карточки, которые есть в каталоге.' }
   }
   if (input.role === 'produces' && from.kind !== 'source') {
-    return { ok: false, message: 'A produces connection starts at a source card.' }
+    return { ok: false, message: 'Связь produces начинается с карточки источника.' }
   }
   if (input.role === 'uses' && from.kind !== 'consumer') {
-    return { ok: false, message: 'A uses connection starts at a consumer card.' }
+    return { ok: false, message: 'Связь uses начинается с карточки потребителя.' }
   }
   const duplicate = catalog.links.some((link) => {
     const ends = linkEnds(link)
     return link.role === input.role && ends.fromId === fromId && ends.toId === input.resourceId
   })
   if (duplicate) {
-    return { ok: false, message: 'This connection already exists.' }
+    return { ok: false, message: 'Такая связь уже есть.' }
   }
   const link: CatalogLink = input.role === 'produces'
     ? { id: `link:${fromId}:${input.resourceId}:produces`, role: 'produces', sourceId: fromId, resourceId: input.resourceId }
@@ -148,7 +148,7 @@ export function addCatalogLink(
 
 export function removeCatalogLink(catalog: ResourceCatalog, linkId: string): { ok: true; catalog: ResourceCatalog } | { ok: false; message: string } {
   if (!catalog.links.some((link) => link.id === linkId)) {
-    return { ok: false, message: 'That connection is not in the catalog.' }
+    return { ok: false, message: 'Такой связи нет в каталоге.' }
   }
   return parseResourceCatalog({ ...catalog, links: catalog.links.filter((link) => link.id !== linkId) })
 }

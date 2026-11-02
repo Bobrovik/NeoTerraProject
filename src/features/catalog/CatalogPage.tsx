@@ -46,7 +46,7 @@ export function CatalogPage() {
   const [query, setQuery] = useState<CatalogListQuery>(initialQuery)
 
   if (!stored.ok) {
-    return <ErrorState title="The resource catalog could not be read" detail={stored.message} />
+    return <ErrorState title="Каталог не удалось прочитать" detail={stored.message} />
   }
 
   const counts = countCardsByKind(stored.catalog.cards)
@@ -58,9 +58,9 @@ export function CatalogPage() {
     <div className={styles.page}>
       <header className={styles.heading}>
         <div>
-          <h1>Catalog</h1>
+          <h1>Каталог</h1>
           <p className={controls.muted}>
-            Resources, the sources that provide them, and the consumers that use them.
+            Универсальные описания ресурсов, источников и потребителей. Расположение и фактические показатели хранит модель города.
           </p>
           <p className={styles.counts}>
             {kinds.map((kind) => (
@@ -72,12 +72,12 @@ export function CatalogPage() {
           </p>
         </div>
         <div className={styles.actions}>
-          <Link className={controls.ghost} to="/catalog/network">Resource network</Link>
-          <Link className={controls.button} to="/catalog/new">Create card</Link>
+          <Link className={controls.ghost} to="/catalog/network">Сеть связей</Link>
+          <Link className={controls.button} to="/catalog/new">Создать карточку</Link>
         </div>
       </header>
-      <div className={styles.tabs} role="group" aria-label="Card type">
-        <button className={controls.toggle} type="button" aria-pressed={query.kind === 'all'} onClick={() => update({ kind: 'all' })}>All</button>
+      <div className={styles.tabs} role="group" aria-label="Тип карточки">
+        <button className={controls.toggle} type="button" aria-pressed={query.kind === 'all'} onClick={() => update({ kind: 'all' })}>Все</button>
         {kinds.map((kind) => (
           <button key={kind} className={controls.toggle} type="button" aria-pressed={query.kind === kind} onClick={() => update({ kind })}>
             <KindMark kind={kind} />
@@ -86,62 +86,62 @@ export function CatalogPage() {
       </div>
       <div className={styles.filters}>
         <label className={controls.stack}>
-          Search
-          <input className={controls.field} value={query.text} onChange={(event) => update({ text: event.target.value })} placeholder="Name, description, or category" />
+          Поиск
+          <input className={controls.field} value={query.text} onChange={(event) => update({ text: event.target.value })} placeholder="Название, описание или категория" />
         </label>
         <label className={controls.stack}>
-          Category
+          Категория
           <select className={controls.select} value={query.category} onChange={(event) => update({ category: event.target.value })}>
-            <option value="">All categories</option>
+            <option value="">Все категории</option>
             {categories.map((category) => <option key={category} value={category}>{category}</option>)}
           </select>
         </label>
         <label className={controls.stack}>
-          Scarcity
+          Дефицитность
           <select className={controls.select} value={query.scarcity} onChange={(event) => update({ scarcity: event.target.value as Scarcity | '' })}>
-            <option value="">All scarcity levels</option>
+            <option value="">Любая дефицитность</option>
             {scarcities.map((scarcity) => <option key={scarcity} value={scarcity}>{scarcityLabels[scarcity]}</option>)}
           </select>
         </label>
         <label className={controls.stack}>
-          Priority
+          Приоритет
           <select className={controls.select} value={query.priority} onChange={(event) => update({ priority: event.target.value as Priority | '' })}>
-            <option value="">All priorities</option>
+            <option value="">Любой приоритет</option>
             {priorities.map((priority) => <option key={priority} value={priority}>{priorityLabels[priority]}</option>)}
           </select>
         </label>
         <label className={controls.stack}>
-          Status
+          Статус
           <select className={controls.select} value={query.status} onChange={(event) => update({ status: event.target.value as CardStatus | '' })}>
-            <option value="">All statuses</option>
+            <option value="">Любой статус</option>
             {statuses.map((status) => <option key={status} value={status}>{cardStatusLabels[status]}</option>)}
           </select>
         </label>
         <label className={controls.stack}>
-          Sort
+          Сортировка
           <select className={controls.select} value={query.sort} onChange={(event) => update({ sort: event.target.value as CatalogSort })}>
-            <option value="name">Name</option>
-            <option value="created">Creation date</option>
-            <option value="updated">Modification date</option>
-            <option value="priority">Priority</option>
+            <option value="name">Название</option>
+            <option value="created">Дата создания</option>
+            <option value="updated">Дата изменения</option>
+            <option value="priority">Приоритет</option>
           </select>
         </label>
       </div>
       {stored.catalog.cards.length === 0 ? (
-        <EmptyState title="No cards yet" detail="Create a card to record a resource, a source, or a consumer." />
+        <EmptyState title="Карточек пока нет" detail="Создайте карточку ресурса, источника или потребителя." />
       ) : null}
       {stored.catalog.cards.length > 0 && cards.length === 0 ? (
-        <EmptyState title="No matching cards" detail="Nothing in the saved catalog matches this search and these filters." />
+        <EmptyState title="Нет подходящих карточек" detail="В сохранённом каталоге нет карточек с таким поиском и фильтрами." />
       ) : null}
       {cards.length > 0 ? (
         <ul className={styles.list}>
           {cards.map((card) => (
             <li key={card.id}>
               <Link className={styles.card} to={`/catalog/${card.id}`}>
-              <strong>{card.name.trim() || 'Untitled'}</strong>
+              <strong>{card.name.trim() || 'Без названия'}</strong>
               <div className={styles.meta}>
                 <KindMark kind={card.kind} />
-                <span>{card.category || 'No category'}</span>
+                <span>{card.category || 'Без категории'}</span>
                 <span>{scarcityLabels[card.scarcity]}</span>
                 <span>{priorityLabels[card.priority]}</span>
                 <span>{cardStatusLabels[card.status]}</span>

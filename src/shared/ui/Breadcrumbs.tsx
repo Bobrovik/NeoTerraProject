@@ -40,15 +40,15 @@ export function Breadcrumbs() {
     }
   } else if (location.pathname.startsWith('/catalog')) {
     const nested = location.pathname !== '/catalog'
-    crumbs.push({ label: 'Home', to: '/' }, nested ? { label: 'Catalog', to: '/catalog' } : { label: 'Catalog' })
+    crumbs.push({ label: 'Главная', to: '/' }, nested ? { label: 'Каталог', to: '/catalog' } : { label: 'Каталог' })
     if (location.pathname === '/catalog/new') {
-      crumbs.push({ label: 'New card' })
+      crumbs.push({ label: 'Новая карточка' })
     } else if (location.pathname === '/catalog/network') {
-      crumbs.push({ label: 'Resource network' })
+      crumbs.push({ label: 'Сеть связей' })
     } else if (cardId) {
       const read = readResourceCatalog(localStorage)
       const card = read.ok ? read.catalog.cards.find((item) => item.id === cardId) : undefined
-      crumbs.push({ label: card?.name.trim() || 'Card' })
+      crumbs.push({ label: card?.name.trim() || 'Карточка' })
     }
   } else if (location.pathname.startsWith('/documents')) {
     crumbs.push({ label: 'Documents', to: '/documents' })

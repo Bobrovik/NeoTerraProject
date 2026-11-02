@@ -8,6 +8,7 @@ import {
   type EvidenceStudyType,
   type EvidenceVerification,
   type MeasuredQuantity,
+  type CharacteristicAspect,
   type QuantityKind,
   type RegionalAvailability,
   type ResourceAccounts,
@@ -26,6 +27,7 @@ export type QuantityDraft = {
   periodEnd: string
   conditions: string
   evidenceId: string
+  aspect: CharacteristicAspect | ''
 }
 
 export type EvidenceDraft = {
@@ -41,8 +43,6 @@ export type EvidenceDraft = {
 
 export type RegionDraft = {
   id: string
-  regionId: string
-  regionLabel: string
   availability: QuantityDraft
   supplyDeficit: QuantityDraft
 }
@@ -59,9 +59,6 @@ export type CardDraft = {
   status: CatalogCard['status']
   priority: CatalogCard['priority']
   scarcity: CatalogCard['scarcity']
-  cityId: string
-  regionId: string
-  regionLabel: string
   createdAt: string
   quantities: QuantityDraft[]
   evidence: EvidenceDraft[]
@@ -103,6 +100,7 @@ export function blankQuantity(id: string): QuantityDraft {
     periodEnd: '',
     conditions: '',
     evidenceId: '',
+    aspect: '',
   }
 }
 
@@ -119,9 +117,6 @@ export function createCardDraft(input: { id: string; kind: CatalogCard['kind']; 
     status: 'draft',
     priority: 'P3',
     scarcity: 'unknown',
-    cityId: '',
-    regionId: '',
-    regionLabel: '',
     createdAt: input.createdAt,
     quantities: [],
     evidence: [],
@@ -163,9 +158,6 @@ export function cardToDraft(card: CatalogCard, links: readonly CatalogLink[]): C
   draft.status = card.status
   draft.priority = card.priority
   draft.scarcity = card.scarcity
-  draft.cityId = card.cityId ?? ''
-  draft.regionId = card.regionId ?? ''
-  draft.regionLabel = card.regionLabel ?? ''
   draft.quantities = card.quantities.map((quantity) => quantityToDraft(quantity, quantity.id))
   draft.evidence = card.evidence.map(evidenceToDraft)
   draft.physicalAbundance = quantityToDraft(card.accounts?.physicalAbundance, draft.physicalAbundance.id)
@@ -174,8 +166,6 @@ export function cardToDraft(card: CatalogCard, links: readonly CatalogLink[]): C
   draft.supplyDeficit = quantityToDraft(card.accounts?.supplyDeficit, draft.supplyDeficit.id)
   draft.regional = (card.accounts?.regional ?? []).map((region) => ({
     id: region.id,
-    regionId: region.regionId ?? '',
-    regionLabel: region.regionLabel ?? '',
     availability: quantityToDraft(region.availability, `${region.id}:availability`),
     supplyDeficit: quantityToDraft(region.supplyDeficit, `${region.id}:deficit`),
   }))
@@ -270,12 +260,7 @@ export function applyCardDraft(
     quantities: quantities.quantities,
     evidence: evidence.evidence,
   }
-  assignText(card, {
-    subcategory: draft.subcategory,
-    cityId: draft.cityId,
-    regionId: draft.regionId,
-    regionLabel: draft.regionLabel,
-  })
+  assignText(card, { subcategory: draft.subcategory })
   const imageUrl = draft.imageUrl.trim()
   if (imageUrl) {
     card.image = { kind: draft.imageKind, url: imageUrl }
@@ -310,7 +295,7 @@ function draftEvidence(rows: readonly EvidenceDraft[]): { ok: true; evidence: Ev
       return year
     }
     if (year.value !== null && !Number.isInteger(year.value)) {
-      return { ok: false, message: 'Enter a whole year, or leave it empty.' }
+      return { ok: false, message: 'Укажите целый год или оставьте поле пустым.' }
     }
     evidence.push({
       id: row.id,
@@ -374,14 +359,13 @@ function draftAccounts(
       return supplyDeficit
     }
     const next: RegionalAvailability = { id: region.id }
-    assignText(next, { regionId: region.regionId, regionLabel: region.regionLabel })
     if (availability.quantity) {
       next.availability = availability.quantity
     }
     if (supplyDeficit.quantity) {
       next.supplyDeficit = supplyDeficit.quantity
     }
-    if (next.regionId || next.regionLabel || next.availability || next.supplyDeficit) {
+    if (next.availability || next.supplyDeficit) {
       accounts.regional.push(next)
     }
   }
@@ -478,7 +462,7 @@ function linksForDraft(catalog: ResourceCatalog, draft: CardDraft): { ok: true; 
   for (const resourceId of resourceIds) {
     const resource = catalog.cards.find((card) => card.id === resourceId)
     if (!resource || resource.kind !== 'resource') {
-      return { ok: false, message: 'Choose a resource card that exists.' }
+      return { ok: false, message: 'Выберите карточку ресурса, которая есть в каталоге.' }
     }
     if (draft.kind === 'source') {
       const previous = catalog.links.find((link) => link.role === 'produces' && link.sourceId === draft.id && link.resourceId === resourceId)
@@ -517,6 +501,9 @@ function toQuantity(
     periodEnd: draft.periodEnd,
     conditions: draft.conditions,
   })
+  if (draft.aspect) {
+    quantity.aspect = draft.aspect
+  }
   if (draft.evidenceId && evidenceIds.has(draft.evidenceId)) {
     quantity.evidenceId = draft.evidenceId
   }
@@ -538,6 +525,7 @@ function quantityToDraft(quantity: MeasuredQuantity | undefined, fallbackId: str
     periodEnd: quantity.periodEnd ?? '',
     conditions: quantity.conditions ?? '',
     evidenceId: quantity.evidenceId ?? '',
+    aspect: quantity.aspect ?? '',
   }
 }
 
@@ -570,7 +558,7 @@ function readOptionalNumber(text: string, label: string): { ok: true; value: num
   }
   const value = Number(trimmed)
   if (!Number.isFinite(value)) {
-    return { ok: false, message: `Enter a number for ${label}, or leave it empty.` }
+    return { ok: false, message: `Введите число для «${label}» или оставьте поле пустым.` }
   }
   return { ok: true, value }
 }

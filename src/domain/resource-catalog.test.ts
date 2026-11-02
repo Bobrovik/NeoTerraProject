@@ -117,10 +117,24 @@ describe('resource catalog cards', () => {
         value: 100,
       }),
     ]
-    resource.accounts = {
-      regional: [{ id: 'region:1', regionLabel: 'Example basin', regionId: 'region:basin' }],
-    }
-    const parsed = parseResourceCatalog({ version: 1, cards: [resource], links: [] })
+    const parsed = parseResourceCatalog({
+      version: 1,
+      cards: [{
+        ...resource,
+        cityId: 'city:aurora',
+        regionId: 'region:basin',
+        regionLabel: 'Example basin',
+        accounts: {
+          regional: [{
+            id: 'region:1',
+            regionLabel: 'Example basin',
+            regionId: 'region:basin',
+            availability: quantity({ id: 'qty:basin', name: 'Stored volume', quantityKind: 'volume', unit: 'm3', value: null }),
+          }],
+        },
+      }],
+      links: [],
+    })
     expect(parsed.ok).toBe(true)
     if (!parsed.ok) {
       return
@@ -129,7 +143,12 @@ describe('resource catalog cards', () => {
     expect(stored?.quantities.map((item) => item.quantityKind)).toEqual(['power', 'energy', 'productionRate'])
     expect(stored?.quantities.map((item) => item.unit)).toEqual(['kW', 'kWh', 'm3/h'])
     expect(stored?.evidence).toHaveLength(2)
-    expect(stored?.accounts?.regional[0]?.regionLabel).toBe('Example basin')
+    expect(stored).not.toHaveProperty('cityId')
+    expect(stored).not.toHaveProperty('regionId')
+    expect(stored).not.toHaveProperty('regionLabel')
+    expect(stored?.accounts?.regional[0]).not.toHaveProperty('regionLabel')
+    expect(stored?.accounts?.regional[0]?.availability?.value).toBeNull()
+    expect(stored?.accounts?.regional[0]?.availability?.name).toBe('Stored volume')
     expect(stored?.quantities[0]?.value).toBe(500)
   })
 
@@ -140,7 +159,7 @@ describe('resource catalog cards', () => {
     const parsed = parseResourceCatalog({ version: 1, cards: [draft], links: [] })
     expect(parsed.ok).toBe(false)
     if (!parsed.ok) {
-      expect(parsed.message).toBe('A measurement cites evidence that is not on this card.')
+      expect(parsed.message).toBe('Измерение ссылается на исследование, которого нет в карточке.')
     }
   })
 })
@@ -211,14 +230,14 @@ describe('resource catalog storage', () => {
 
   it('reports corrupt JSON and an unknown version without replacing stored text', () => {
     const corrupt = memoryStore({ [resourceCatalogStorageKey]: '{not json' })
-    expect(readResourceCatalog(corrupt)).toEqual({ ok: false, message: 'The resource catalog is not valid JSON.' })
+    expect(readResourceCatalog(corrupt)).toEqual({ ok: false, message: 'Файл каталога не является корректным JSON.' })
     expect(corrupt.data[resourceCatalogStorageKey]).toBe('{not json')
 
     const unknown = memoryStore({ [resourceCatalogStorageKey]: JSON.stringify({ version: 2, cards: [], links: [] }) })
     const read = readResourceCatalog(unknown)
     expect(read.ok).toBe(false)
     if (!read.ok) {
-      expect(read.message).toBe('The resource catalog version is not supported.')
+      expect(read.message).toBe('Версия файла каталога не поддерживается.')
     }
     expect(unknown.data[resourceCatalogStorageKey]).toContain('"version":2')
   })
