@@ -1,4 +1,6 @@
 import { catalogFailure, type CatalogMessageCode } from './catalog-message'
+import { findProperty, type QuantityLibrary } from './quantity/definitions'
+import { legacyKindForQuantity } from './quantity/legacy'
 import {
   parseResourceCatalog,
   type CatalogCard,
@@ -12,6 +14,7 @@ import {
   type CharacteristicAspect,
   type QuantityKind,
   type RegionalAvailability,
+  type ValueOrigin,
   type ResourceAccounts,
   type ResourceCatalog,
   type SourceProfile,
@@ -22,7 +25,20 @@ export type QuantityDraft = {
   name: string
   valueText: string
   unit: string
-  quantityKind: QuantityKind
+  quantityKind: QuantityKind | ''
+  propertyId: string
+  quantityId: string
+  unitId: string
+  valueOrigin: ValueOrigin | ''
+  method: string
+  uncertaintyText: string
+  lowerText: string
+  upperText: string
+  textValue: string
+  conditionTemperatureText: string
+  conditionTemperatureUnitId: string
+  conditionPressureText: string
+  conditionPressureUnitId: string
   measuredAt: string
   periodStart: string
   periodEnd: string
@@ -96,6 +112,19 @@ export function blankQuantity(id: string): QuantityDraft {
     valueText: '',
     unit: '',
     quantityKind: 'mass',
+    propertyId: '',
+    quantityId: '',
+    unitId: '',
+    valueOrigin: '',
+    method: '',
+    uncertaintyText: '',
+    lowerText: '',
+    upperText: '',
+    textValue: '',
+    conditionTemperatureText: '',
+    conditionTemperatureUnitId: '',
+    conditionPressureText: '',
+    conditionPressureUnitId: '',
     measuredAt: '',
     periodStart: '',
     periodEnd: '',
@@ -148,7 +177,7 @@ export function createCardDraft(input: { id: string; kind: CatalogCard['kind']; 
   }
 }
 
-export function cardToDraft(card: CatalogCard, links: readonly CatalogLink[]): CardDraft {
+export function cardToDraft(card: CatalogCard, links: readonly CatalogLink[], library?: QuantityLibrary): CardDraft {
   const draft = createCardDraft({ id: card.id, kind: card.kind, createdAt: card.createdAt })
   draft.name = card.name
   draft.category = card.category
@@ -159,31 +188,31 @@ export function cardToDraft(card: CatalogCard, links: readonly CatalogLink[]): C
   draft.status = card.status
   draft.priority = card.priority
   draft.scarcity = card.scarcity
-  draft.quantities = card.quantities.map((quantity) => quantityToDraft(quantity, quantity.id))
+  draft.quantities = card.quantities.map((quantity) => quantityToDraft(quantity, quantity.id, library))
   draft.evidence = card.evidence.map(evidenceToDraft)
-  draft.physicalAbundance = quantityToDraft(card.accounts?.physicalAbundance, draft.physicalAbundance.id)
-  draft.totalReserves = quantityToDraft(card.accounts?.totalReserves, draft.totalReserves.id)
-  draft.recoverableReserves = quantityToDraft(card.accounts?.recoverableReserves, draft.recoverableReserves.id)
-  draft.supplyDeficit = quantityToDraft(card.accounts?.supplyDeficit, draft.supplyDeficit.id)
+  draft.physicalAbundance = quantityToDraft(card.accounts?.physicalAbundance, draft.physicalAbundance.id, library)
+  draft.totalReserves = quantityToDraft(card.accounts?.totalReserves, draft.totalReserves.id, library)
+  draft.recoverableReserves = quantityToDraft(card.accounts?.recoverableReserves, draft.recoverableReserves.id, library)
+  draft.supplyDeficit = quantityToDraft(card.accounts?.supplyDeficit, draft.supplyDeficit.id, library)
   draft.regional = (card.accounts?.regional ?? []).map((region) => ({
     id: region.id,
-    availability: quantityToDraft(region.availability, `${region.id}:availability`),
-    supplyDeficit: quantityToDraft(region.supplyDeficit, `${region.id}:deficit`),
+    availability: quantityToDraft(region.availability, `${region.id}:availability`, library),
+    supplyDeficit: quantityToDraft(region.supplyDeficit, `${region.id}:deficit`, library),
   }))
-  draft.productionVolume = quantityToDraft(card.sourceProfile?.productionVolume, draft.productionVolume.id)
-  draft.outputPerTime = quantityToDraft(card.sourceProfile?.outputPerTime, draft.outputPerTime.id)
-  draft.maxCapacity = quantityToDraft(card.sourceProfile?.maxCapacity, draft.maxCapacity.id)
-  draft.energyCost = quantityToDraft(card.sourceProfile?.energyCost, draft.energyCost.id)
-  draft.efficiency = quantityToDraft(card.sourceProfile?.efficiency, draft.efficiency.id)
-  draft.footprint = quantityToDraft(card.sourceProfile?.footprint, draft.footprint.id)
+  draft.productionVolume = quantityToDraft(card.sourceProfile?.productionVolume, draft.productionVolume.id, library)
+  draft.outputPerTime = quantityToDraft(card.sourceProfile?.outputPerTime, draft.outputPerTime.id, library)
+  draft.maxCapacity = quantityToDraft(card.sourceProfile?.maxCapacity, draft.maxCapacity.id, library)
+  draft.energyCost = quantityToDraft(card.sourceProfile?.energyCost, draft.energyCost.id, library)
+  draft.efficiency = quantityToDraft(card.sourceProfile?.efficiency, draft.efficiency.id, library)
+  draft.footprint = quantityToDraft(card.sourceProfile?.footprint, draft.footprint.id, library)
   draft.sourceOperations = card.sourceProfile?.operations ?? ''
   draft.continuous = card.sourceProfile?.continuous === undefined ? '' : card.sourceProfile.continuous ? 'yes' : 'no'
   draft.naturalConditions = card.sourceProfile?.naturalConditions ?? ''
   draft.producedResourceIds = links.filter((link) => link.role === 'produces' && link.sourceId === card.id).map((link) => link.resourceId)
-  draft.quantityUsed = quantityToDraft(card.consumerProfile?.quantityUsed, draft.quantityUsed.id)
+  draft.quantityUsed = quantityToDraft(card.consumerProfile?.quantityUsed, draft.quantityUsed.id, library)
   draft.timeUnit = card.consumerProfile?.timeUnit ?? ''
-  draft.peakLoad = quantityToDraft(card.consumerProfile?.peakLoad, draft.peakLoad.id)
-  draft.averageLoad = quantityToDraft(card.consumerProfile?.averageLoad, draft.averageLoad.id)
+  draft.peakLoad = quantityToDraft(card.consumerProfile?.peakLoad, draft.peakLoad.id, library)
+  draft.averageLoad = quantityToDraft(card.consumerProfile?.averageLoad, draft.averageLoad.id, library)
   draft.servedText = card.consumerProfile?.served === undefined || card.consumerProfile.served === null ? '' : String(card.consumerProfile.served)
   draft.consumerOperations = card.consumerProfile?.operations ?? ''
   draft.wasteProcessing = card.consumerProfile?.wasteProcessing ?? ''
@@ -484,21 +513,64 @@ function toQuantity(
     return { ok: true }
   }
   const amount = readOptionalNumber(draft.valueText)
-  if (!amount.ok) {
-    return amount
+  const uncertainty = readOptionalNumber(draft.uncertaintyText)
+  const lower = readOptionalNumber(draft.lowerText)
+  const upper = readOptionalNumber(draft.upperText)
+  const temperature = readOptionalNumber(draft.conditionTemperatureText)
+  const pressure = readOptionalNumber(draft.conditionPressureText)
+  const failed = [amount, uncertainty, lower, upper, temperature, pressure].find((item) => !item.ok)
+  if (failed && !failed.ok) {
+    return failed
   }
+  if (!amount.ok || !uncertainty.ok || !lower.ok || !upper.ok || !temperature.ok || !pressure.ok) {
+    return catalogFailure('form.number')
+  }
+  if (lower.value !== null && upper.value !== null && upper.value < lower.value) {
+    return catalogFailure('form.number')
+  }
+  const mappedKind = draft.propertyId ? legacyKindForQuantity(draft.quantityId || undefined, draft.propertyId) : undefined
   const quantity: MeasuredQuantity = {
     id: draft.id,
     name: draft.name.trim(),
     value: amount.value,
     unit: draft.unit.trim(),
-    quantityKind: draft.quantityKind,
+  }
+  if (draft.propertyId) {
+    quantity.propertyId = draft.propertyId
+    if (draft.unitId) {
+      quantity.unitId = draft.unitId
+    }
+    if (mappedKind) {
+      quantity.quantityKind = mappedKind
+    }
+  } else if (draft.quantityKind) {
+    quantity.quantityKind = draft.quantityKind
+  }
+  if (draft.valueOrigin) {
+    quantity.valueOrigin = draft.valueOrigin
+  }
+  if (uncertainty.value !== null) {
+    quantity.uncertainty = uncertainty.value
+  }
+  if (lower.value !== null) {
+    quantity.lower = lower.value
+  }
+  if (upper.value !== null) {
+    quantity.upper = upper.value
+  }
+  if (temperature.value !== null && draft.conditionTemperatureUnitId) {
+    quantity.conditionTemperature = { value: temperature.value, unitId: draft.conditionTemperatureUnitId }
+  }
+  if (pressure.value !== null && draft.conditionPressureUnitId) {
+    quantity.conditionPressure = { value: pressure.value, unitId: draft.conditionPressureUnitId }
   }
   assignText(quantity, {
     measuredAt: draft.measuredAt,
     periodStart: draft.periodStart,
     periodEnd: draft.periodEnd,
     conditions: draft.conditions,
+    method: draft.method,
+    textValue: draft.textValue,
   })
   if (draft.aspect) {
     quantity.aspect = draft.aspect
@@ -509,16 +581,30 @@ function toQuantity(
   return { ok: true, quantity }
 }
 
-function quantityToDraft(quantity: MeasuredQuantity | undefined, fallbackId: string): QuantityDraft {
+function quantityToDraft(quantity: MeasuredQuantity | undefined, fallbackId: string, library?: QuantityLibrary): QuantityDraft {
   if (!quantity) {
     return blankQuantity(fallbackId)
   }
+  const defined = quantity.propertyId && library ? findProperty(library, quantity.propertyId) : undefined
   return {
     id: quantity.id,
     name: quantity.name,
     valueText: quantity.value === null ? '' : String(quantity.value),
     unit: quantity.unit,
-    quantityKind: quantity.quantityKind,
+    quantityKind: quantity.quantityKind ?? '',
+    propertyId: quantity.propertyId ?? '',
+    quantityId: defined?.quantityId ?? '',
+    unitId: quantity.unitId ?? '',
+    valueOrigin: quantity.valueOrigin ?? '',
+    method: quantity.method ?? '',
+    uncertaintyText: quantity.uncertainty === undefined ? '' : String(quantity.uncertainty),
+    lowerText: quantity.lower === undefined ? '' : String(quantity.lower),
+    upperText: quantity.upper === undefined ? '' : String(quantity.upper),
+    textValue: quantity.textValue ?? '',
+    conditionTemperatureText: quantity.conditionTemperature ? String(quantity.conditionTemperature.value) : '',
+    conditionTemperatureUnitId: quantity.conditionTemperature?.unitId ?? '',
+    conditionPressureText: quantity.conditionPressure ? String(quantity.conditionPressure.value) : '',
+    conditionPressureUnitId: quantity.conditionPressure?.unitId ?? '',
     measuredAt: quantity.measuredAt ?? '',
     periodStart: quantity.periodStart ?? '',
     periodEnd: quantity.periodEnd ?? '',
@@ -542,7 +628,7 @@ function evidenceToDraft(evidence: Evidence): EvidenceDraft {
 }
 
 function isBlankQuantity(draft: QuantityDraft): boolean {
-  return [draft.name, draft.valueText, draft.unit, draft.measuredAt, draft.periodStart, draft.periodEnd, draft.conditions, draft.evidenceId]
+  return [draft.name, draft.valueText, draft.unit, draft.propertyId, draft.method, draft.uncertaintyText, draft.lowerText, draft.upperText, draft.textValue, draft.measuredAt, draft.periodStart, draft.periodEnd, draft.conditions, draft.evidenceId]
     .every((value) => value.trim() === '')
 }
 

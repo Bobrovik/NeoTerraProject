@@ -56,12 +56,31 @@ export type Evidence = {
   verification: EvidenceVerification
 }
 
+export const valueOrigins = ['measured', 'experimental', 'calculated', 'model', 'regulatory', 'design'] as const
+
+export type ValueOrigin = (typeof valueOrigins)[number]
+
+export type ConditionReading = {
+  value: number
+  unitId: string
+}
+
 export type MeasuredQuantity = {
   id: string
   name: string
   value: number | null
   unit: string
-  quantityKind: QuantityKind
+  quantityKind?: QuantityKind
+  propertyId?: string
+  unitId?: string
+  valueOrigin?: ValueOrigin
+  method?: string
+  uncertainty?: number
+  lower?: number
+  upper?: number
+  textValue?: string
+  conditionTemperature?: ConditionReading
+  conditionPressure?: ConditionReading
   measuredAt?: string
   periodStart?: string
   periodEnd?: string
@@ -389,7 +408,14 @@ function parseQuantity(value: unknown, evidenceIds: Set<string>): { ok: true; qu
   const id = readId(value.id)
   const name = readText(value.name)
   const unit = readText(value.unit)
-  if (!id || name === undefined || unit === undefined || !isQuantityKind(value.quantityKind)) {
+  const propertyId = readOptionalString(value, 'propertyId')
+  const unitId = readOptionalString(value, 'unitId')
+  const hasKind = isQuantityKind(value.quantityKind)
+  const hasProperty = propertyId.ok && propertyId.value !== undefined && unitId.ok && unitId.value !== undefined
+  if (!id || name === undefined || unit === undefined || !propertyId.ok || !unitId.ok || (!hasKind && !hasProperty)) {
+    return catalogFailure('quantity.missing-fields')
+  }
+  if ('quantityKind' in value && value.quantityKind !== undefined && !hasKind) {
     return catalogFailure('quantity.missing-fields')
   }
   if (!('value' in value)) {
@@ -413,8 +439,33 @@ function parseQuantity(value: unknown, evidenceIds: Set<string>): { ok: true; qu
   if ('aspect' in value && value.aspect !== undefined && !isCharacteristicAspect(value.aspect)) {
     return catalogFailure('quantity.bad-aspect')
   }
-  const quantity: MeasuredQuantity = { id, name, value: amount, unit, quantityKind: value.quantityKind }
+  const method = readOptionalString(value, 'method')
+  const textValue = readOptionalString(value, 'textValue')
+  const uncertainty = readOptionalFinite(value, 'uncertainty')
+  const lower = readOptionalFinite(value, 'lower')
+  const upper = readOptionalFinite(value, 'upper')
+  const origin = readOptionalOrigin(value)
+  const conditionTemperature = readCondition(value, 'conditionTemperature')
+  const conditionPressure = readCondition(value, 'conditionPressure')
+  if (!method.ok || !textValue.ok || !uncertainty.ok || !lower.ok || !upper.ok || !origin.ok || !conditionTemperature.ok || !conditionPressure.ok) {
+    return catalogFailure('quantity.bad-text')
+  }
+  if (lower.value !== undefined && upper.value !== undefined && upper.value < lower.value) {
+    return catalogFailure('quantity.bad-value')
+  }
+  const quantity: MeasuredQuantity = { id, name, value: amount, unit }
   assignOptional(quantity, {
+    quantityKind: hasKind ? value.quantityKind : undefined,
+    propertyId: propertyId.value,
+    unitId: unitId.value,
+    valueOrigin: origin.value,
+    method: method.value,
+    uncertainty: uncertainty.value,
+    lower: lower.value,
+    upper: upper.value,
+    textValue: textValue.value,
+    conditionTemperature: conditionTemperature.value,
+    conditionPressure: conditionPressure.value,
     measuredAt: measuredAt.value,
     periodStart: periodStart.value,
     periodEnd: periodEnd.value,
@@ -604,6 +655,36 @@ function readId(value: unknown): string | undefined {
 
 function readText(value: unknown): string | undefined {
   return typeof value === 'string' ? value : undefined
+}
+
+function readOptionalFinite(record: Record<string, unknown>, key: string): { ok: true; value?: number } | { ok: false } {
+  if (!(key in record) || record[key] === undefined) {
+    return { ok: true }
+  }
+  if (typeof record[key] !== 'number' || !Number.isFinite(record[key])) {
+    return { ok: false }
+  }
+  return { ok: true, value: record[key] }
+}
+
+function readOptionalOrigin(record: Record<string, unknown>): { ok: true; value?: ValueOrigin } | { ok: false } {
+  if (!('valueOrigin' in record) || record.valueOrigin === undefined) {
+    return { ok: true }
+  }
+  if (typeof record.valueOrigin !== 'string' || !(valueOrigins as readonly string[]).includes(record.valueOrigin)) {
+    return { ok: false }
+  }
+  return { ok: true, value: record.valueOrigin as ValueOrigin }
+}
+
+function readCondition(record: Record<string, unknown>, key: string): { ok: true; value?: ConditionReading } | { ok: false } {
+  if (!(key in record) || record[key] === undefined) {
+    return { ok: true }
+  }
+  if (!isRecord(record[key]) || typeof record[key].value !== 'number' || !Number.isFinite(record[key].value) || typeof record[key].unitId !== 'string' || record[key].unitId.length === 0) {
+    return { ok: false }
+  }
+  return { ok: true, value: { value: record[key].value, unitId: record[key].unitId } }
 }
 
 function readNullableNumber(value: unknown): number | null | undefined {

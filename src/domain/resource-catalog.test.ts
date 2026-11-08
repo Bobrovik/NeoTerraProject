@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { layoutStorageKey } from '../data/layout-storage'
 import { readResourceCatalog, resourceCatalogStorageKey, writeResourceCatalog, type CatalogStore } from '../data/resource-catalog-storage'
+import { needsQuantityReview } from './quantity/legacy'
 import { createCatalogCard, parseResourceCatalog, type CatalogCard, type Evidence, type MeasuredQuantity } from './resource-catalog'
 
 function memoryStore(initial: Record<string, string> = {}): CatalogStore & { data: Record<string, string> } {
@@ -190,6 +191,76 @@ describe('resource catalog links', () => {
     expect(parsed.catalog.links).toHaveLength(4)
     expect(parsed.catalog.cards.find((item) => item.id === 'card:hospital')?.consumerProfile?.served).toBeNull()
     expect(parsed.catalog.cards.find((item) => item.id === 'card:solar')?.sourceProfile?.continuous).toBe(false)
+  })
+
+  it('keeps a legacy measurement and its links unchanged when the file is read twice', () => {
+    const resource = card('resource', 'card:water', 'Water')
+    const source = card('source', 'card:basin', 'Basin')
+    resource.quantities = [quantity({ id: 'qty:stock', name: 'Stored volume', quantityKind: 'volume', unit: 'm3', value: null, evidenceId: 'evidence:note' })]
+    resource.evidence = [{
+      id: 'evidence:note',
+      title: 'Field note',
+      author: 'Survey',
+      year: null,
+      url: null,
+      studyType: 'other',
+      supports: 'Stored volume was not measured.',
+      verification: 'unreviewed',
+    }]
+    const input = {
+      version: 1,
+      cards: [resource, source],
+      links: [{ id: 'link:basin', role: 'produces', sourceId: 'card:basin', resourceId: 'card:water' }],
+    }
+    const once = parseResourceCatalog(input)
+    expect(once.ok).toBe(true)
+    if (!once.ok) {
+      return
+    }
+    const twice = parseResourceCatalog(JSON.parse(JSON.stringify(once.catalog)))
+    expect(twice).toEqual(once)
+    const stored = once.catalog.cards.find((item) => item.id === 'card:water')?.quantities[0]
+    expect(stored).toMatchObject({ value: null, unit: 'm3', quantityKind: 'volume', evidenceId: 'evidence:note' })
+    expect(stored?.propertyId).toBeUndefined()
+    expect(stored ? needsQuantityReview(stored) : false).toBe(true)
+    expect(once.catalog.links).toEqual(input.links)
+  })
+
+  it('reads a scientific measurement without inventing a quantity kind', () => {
+    const resource = card('resource', 'card:water', 'Water')
+    resource.evidence = [{
+      id: 'evidence:lab',
+      title: 'Laboratory note',
+      author: 'Lab',
+      year: 2024,
+      url: null,
+      studyType: 'study',
+      supports: 'pH',
+      verification: 'unreviewed',
+    }]
+    resource.quantities = [{
+      id: 'qty:ph',
+      name: 'pH',
+      value: 7.4,
+      unit: 'pH',
+      propertyId: 'property:ph',
+      unitId: 'unit:pH',
+      valueOrigin: 'measured',
+      method: 'electrode',
+      uncertainty: 0.1,
+      conditions: '25 °C',
+      evidenceId: 'evidence:lab',
+      aspect: 'quality',
+    }]
+    const once = parseResourceCatalog({ version: 1, cards: [resource], links: [] })
+    const twice = once.ok ? parseResourceCatalog(JSON.parse(JSON.stringify(once.catalog))) : once
+    expect(twice).toEqual(once)
+    if (!once.ok) {
+      return
+    }
+    expect(once.catalog.cards[0]?.quantities[0]?.quantityKind).toBeUndefined()
+    expect(once.catalog.cards[0]?.quantities[0]?.value).toBe(7.4)
+    expect(once.catalog.cards[0]?.evidence[0]?.id).toBe('evidence:lab')
   })
 
   it('does not accept a link whose card id is missing or the wrong kind', () => {

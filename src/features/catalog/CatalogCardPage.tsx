@@ -1,8 +1,10 @@
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 import { readResourceCatalog, writeResourceCatalog } from '../../data/resource-catalog-storage'
+import { readQuantityLibrary } from '../../data/quantity-library-storage'
 import {
   applyCardDraft,
+  blankQuantity,
   cardToDraft,
   createCardDraft,
   removeEvidenceDraft,
@@ -11,6 +13,11 @@ import {
   type QuantityDraft,
   type RegionDraft,
 } from '../../domain/resource-catalog-form'
+import { emptyQuantityLibrary, findProperty, type QuantityLibrary } from '../../domain/quantity/definitions'
+import { mergeQuantityLibraries } from '../../domain/quantity/library'
+import { needsQuantityReview } from '../../domain/quantity/legacy'
+import { CharacteristicFields } from './CharacteristicFields'
+import { QuantityLibraryContext, useQuantityLibrary } from './quantity-library-context'
 import type { CatalogCard, CatalogCardKind, CatalogLink, CharacteristicAspect, EvidenceStudyType, EvidenceVerification, MeasuredQuantity, QuantityKind, ResourceCatalog } from '../../domain/resource-catalog'
 import { quantityKinds } from '../../domain/resource-catalog'
 import { accountLabel, aspectLabel, aspects, imageLabel, kindLabel, priorityLabel, priorities, quantityLabel, scarcityLabel, scarcities, statusLabel, statuses, studyLabel, studyTypes, verificationLabel, verifications } from '../../shared/i18n/catalog-labels'
@@ -30,7 +37,10 @@ export function CatalogCardPage({ mode }: { mode: 'new' | 'existing' }) {
   const navigate = useNavigate()
   const { cardId } = useParams()
   const [stored, setStored] = useState(() => readResourceCatalog(localStorage))
-  const [draft, setDraft] = useState<CardDraft | null>(() => initialDraft(mode, cardId))
+  const [libraryRead, setLibraryRead] = useState(() => readQuantityLibrary(localStorage))
+  const userLibrary = libraryRead.ok ? libraryRead.library : emptyQuantityLibrary()
+  const library = mergeQuantityLibraries(userLibrary)
+  const [draft, setDraft] = useState<CardDraft | null>(() => initialDraft(mode, cardId, library))
   const [editing, setEditing] = useState(mode === 'new')
   const [message, setMessage] = useState<string | undefined>()
 
@@ -75,7 +85,7 @@ export function CatalogCardPage({ mode }: { mode: 'new' | 'existing' }) {
     const saved = written.catalog.cards.find((item) => item.id === draft!.id)
     setStored(written)
     if (saved) {
-      setDraft(cardToDraft(saved, written.catalog.links))
+      setDraft(cardToDraft(saved, written.catalog.links, library))
     }
     setEditing(false)
     setMessage(undefined)
@@ -90,7 +100,7 @@ export function CatalogCardPage({ mode }: { mode: 'new' | 'existing' }) {
       return
     }
     if (card) {
-      setDraft(cardToDraft(card, catalog.links))
+      setDraft(cardToDraft(card, catalog.links, library))
       setEditing(false)
       setMessage(undefined)
     }
@@ -117,15 +127,15 @@ export function CatalogCardPage({ mode }: { mode: 'new' | 'existing' }) {
       </header>
       {message ? <p className={controls.error} role="alert">{message}</p> : null}
       {editing ? (
-        <CardForm draft={draft} catalog={catalog} onChange={setDraft} />
+        <CardForm draft={draft} catalog={catalog} library={library} userLibrary={userLibrary} libraryMessage={libraryRead.ok ? undefined : t(libraryRead.code)} onLibrary={(next) => setLibraryRead({ ok: true, library: next })} onChange={setDraft} />
       ) : card ? (
-        <CardView card={card} links={catalog.links} cards={catalog.cards} />
+        <CardView card={card} links={catalog.links} cards={catalog.cards} library={library} />
       ) : null}
     </div>
   )
 }
 
-function initialDraft(mode: 'new' | 'existing', cardId: string | undefined): CardDraft | null {
+function initialDraft(mode: 'new' | 'existing', cardId: string | undefined, library: QuantityLibrary): CardDraft | null {
   if (mode !== 'existing' || !cardId) {
     return null
   }
@@ -134,10 +144,18 @@ function initialDraft(mode: 'new' | 'existing', cardId: string | undefined): Car
     return null
   }
   const card = read.catalog.cards.find((item) => item.id === cardId)
-  return card ? cardToDraft(card, read.catalog.links) : null
+  return card ? cardToDraft(card, read.catalog.links, library) : null
 }
 
-function CardForm({ draft, catalog, onChange }: { draft: CardDraft; catalog: ResourceCatalog; onChange: (draft: CardDraft) => void }) {
+function CardForm({ draft, catalog, library, userLibrary, libraryMessage, onLibrary, onChange }: {
+  draft: CardDraft
+  catalog: ResourceCatalog
+  library: QuantityLibrary
+  userLibrary: QuantityLibrary
+  libraryMessage?: string
+  onLibrary: (library: QuantityLibrary) => void
+  onChange: (draft: CardDraft) => void
+}) {
   const { t } = useI18n()
   const resources = catalog.cards.filter((card) => card.kind === 'resource' && card.id !== draft.id)
   const patch = (next: Partial<CardDraft>) => onChange({ ...draft, ...next })
@@ -145,7 +163,7 @@ function CardForm({ draft, catalog, onChange }: { draft: CardDraft; catalog: Res
   const setResourceIds = (ids: string[]) => patch(draft.kind === 'source' ? { producedResourceIds: ids } : { usedResourceIds: ids })
 
   return (
-    <>
+    <QuantityLibraryContext.Provider value={{ library, userLibrary, libraryMessage, onLibrary }}>
       <section className={styles.section}>
         <h2>{t('card.basic')}</h2>
         <p className={controls.muted}>{t('card.basicNote')}</p>
@@ -282,7 +300,7 @@ function CardForm({ draft, catalog, onChange }: { draft: CardDraft; catalog: Res
           </>
         ) : null}
       </section>
-    </>
+    </QuantityLibraryContext.Provider>
   )
 }
 
@@ -328,7 +346,8 @@ function QuantityEditor({ quantity, evidence, label, onChange, onRemove }: {
   onChange: (quantity: QuantityDraft) => void
   onRemove?: () => void
 }) {
-  const { t } = useI18n()
+  const { language, t } = useI18n()
+  const { library, userLibrary, libraryMessage, onLibrary } = useQuantityLibrary()
   const recorded = quantityHasContent(quantity)
   const [open, setOpen] = useState(Boolean(onRemove) && !recorded)
   const patch = (next: Partial<QuantityDraft>) => onChange({ ...quantity, ...next })
@@ -354,7 +373,7 @@ function QuantityEditor({ quantity, evidence, label, onChange, onRemove }: {
       <div className={styles.measureHead}>
         <div>
           <strong>{title}</strong>
-          <p>{quantity.name.trim() || t('catalog.untitled')} · {value}{quantity.unit.trim() ? ` ${quantity.unit.trim()}` : ''} · {quantityLabel(t, quantity.quantityKind)}{quantity.aspect ? ` · ${aspectLabel(t, quantity.aspect)}` : ''}</p>
+          <p>{quantity.name.trim() || t('catalog.untitled')} · {value}{quantity.unit.trim() ? ` ${quantity.unit.trim()}` : ''} · {draftQuantityLabel(t, language, library, quantity)}{quantity.aspect ? ` · ${aspectLabel(t, quantity.aspect)}` : ''}</p>
           <p className={controls.muted}>{sourceName}</p>
         </div>
         <div className={styles.actions}>
@@ -368,13 +387,18 @@ function QuantityEditor({ quantity, evidence, label, onChange, onRemove }: {
           <div className={styles.grid}>
             <label className={controls.stack}>{t('card.name')}<input className={controls.field} value={quantity.name} onChange={(event) => patch({ name: event.target.value })} /></label>
             <label className={controls.stack}>{t('card.value')}<input className={controls.field} value={quantity.valueText} onChange={(event) => patch({ valueText: event.target.value })} placeholder={t('card.servedEmpty')} /></label>
-            <label className={controls.stack}>{t('card.unit')}<input className={controls.field} value={quantity.unit} onChange={(event) => patch({ unit: event.target.value })} /></label>
-            <label className={controls.stack}>
-              {t('card.quantityKind')}
-              <select className={controls.select} value={quantity.quantityKind} onChange={(event) => patch({ quantityKind: event.target.value as QuantityKind })}>
-                {quantityKinds.map((kind) => <option key={kind} value={kind}>{quantityLabel(t, kind)}</option>)}
-              </select>
-            </label>
+            {quantity.propertyId ? null : (
+              <>
+                <label className={controls.stack}>{t('card.unit')}<input className={controls.field} value={quantity.unit} onChange={(event) => patch({ unit: event.target.value })} /></label>
+                <label className={controls.stack}>
+                  {t('card.quantityKind')}
+                  <select className={controls.select} value={quantity.quantityKind} onChange={(event) => patch({ quantityKind: event.target.value as QuantityKind })}>
+                    {quantityKinds.map((kind) => <option key={kind} value={kind}>{quantityLabel(t, kind)}</option>)}
+                  </select>
+                </label>
+              </>
+            )}
+            <CharacteristicFields quantity={quantity} library={library} userLibrary={userLibrary} libraryMessage={libraryMessage} onChange={patch} onUserLibrary={onLibrary} />
             <label className={controls.stack}>
               {t('card.group')}
               <select className={controls.select} value={quantity.aspect} onChange={(event) => patch({ aspect: event.target.value as CharacteristicAspect })}>
@@ -396,6 +420,13 @@ function QuantityEditor({ quantity, evidence, label, onChange, onRemove }: {
               <label className={controls.stack}>{t('card.measuredAt')}<input className={controls.field} value={quantity.measuredAt} onChange={(event) => patch({ measuredAt: event.target.value })} /></label>
               <label className={controls.stack}>{t('card.periodStart')}<input className={controls.field} value={quantity.periodStart} onChange={(event) => patch({ periodStart: event.target.value })} /></label>
               <label className={controls.stack}>{t('card.periodEnd')}<input className={controls.field} value={quantity.periodEnd} onChange={(event) => patch({ periodEnd: event.target.value })} /></label>
+              <label className={controls.stack}>{t('card.method')}<input className={controls.field} value={quantity.method} onChange={(event) => patch({ method: event.target.value })} /></label>
+              <label className={controls.stack}>{t('card.uncertainty')}<input className={controls.field} value={quantity.uncertaintyText} onChange={(event) => patch({ uncertaintyText: event.target.value })} /></label>
+              <label className={controls.stack}>{t('card.lower')}<input className={controls.field} value={quantity.lowerText} onChange={(event) => patch({ lowerText: event.target.value })} /></label>
+              <label className={controls.stack}>{t('card.upper')}<input className={controls.field} value={quantity.upperText} onChange={(event) => patch({ upperText: event.target.value })} /></label>
+              <label className={controls.stack}>{t('card.textValue')}<input className={controls.field} value={quantity.textValue} onChange={(event) => patch({ textValue: event.target.value })} /></label>
+              <label className={controls.stack}>{t('card.conditionTemperature')}<input className={controls.field} value={quantity.conditionTemperatureText} onChange={(event) => patch({ conditionTemperatureText: event.target.value, conditionTemperatureUnitId: quantity.conditionTemperatureUnitId || 'unit:C' })} /></label>
+              <label className={controls.stack}>{t('card.conditionPressure')}<input className={controls.field} value={quantity.conditionPressureText} onChange={(event) => patch({ conditionPressureText: event.target.value, conditionPressureUnitId: quantity.conditionPressureUnitId || 'unit:Pa' })} /></label>
               <label className={`${controls.stack} ${styles.wide}`}>{t('card.conditions')}<textarea className={controls.area} value={quantity.conditions} onChange={(event) => patch({ conditions: event.target.value })} /></label>
             </div>
           </details>
@@ -467,7 +498,7 @@ function ResourceChoices({ resources, selected, onChange, label }: { resources: 
   )
 }
 
-function CardView({ card, links, cards }: { card: CatalogCard; links: CatalogLink[]; cards: CatalogCard[] }) {
+function CardView({ card, links, cards, library }: { card: CatalogCard; links: CatalogLink[]; cards: CatalogCard[]; library: QuantityLibrary }) {
   const { t } = useI18n()
   const produced = links.filter((link) => link.role === 'produces' && link.sourceId === card.id)
   const used = links.filter((link) => link.role === 'uses' && link.consumerId === card.id)
@@ -496,34 +527,34 @@ function CardView({ card, links, cards }: { card: CatalogCard; links: CatalogLin
           </div>
         ))}
       </section>
-      <QuantityGroup title={t('card.properties')} quantities={grouped(['property'])} evidence={card.evidence} empty={t('card.noProperties')} />
-      <QuantityGroup title={t('card.quality')} quantities={grouped(['quality', 'requirement'])} evidence={card.evidence} empty={t('card.noQuality')} />
+      <QuantityGroup title={t('card.properties')} quantities={grouped(['property'])} evidence={card.evidence} empty={t('card.noProperties')} library={library} />
+      <QuantityGroup title={t('card.quality')} quantities={grouped(['quality', 'requirement'])} evidence={card.evidence} empty={t('card.noQuality')} library={library} />
       <section className={styles.section}>
         <h2>{t('card.metrics')}</h2>
-        {grouped(['metric', undefined]).map((quantity) => <QuantityText key={quantity.id} quantity={quantity} evidence={card.evidence} />)}
-        <QuantityText label={accountLabel(t, 'physicalAbundance')} quantity={card.accounts?.physicalAbundance} evidence={card.evidence} />
-        <QuantityText label={accountLabel(t, 'totalReserves')} quantity={card.accounts?.totalReserves} evidence={card.evidence} />
-        <QuantityText label={accountLabel(t, 'recoverableReserves')} quantity={card.accounts?.recoverableReserves} evidence={card.evidence} />
-        <QuantityText label={accountLabel(t, 'supplyDeficit')} quantity={card.accounts?.supplyDeficit} evidence={card.evidence} />
+        {grouped(['metric', undefined]).map((quantity) => <QuantityText key={quantity.id} quantity={quantity} evidence={card.evidence} library={library} />)}
+        <QuantityText label={accountLabel(t, 'physicalAbundance')} quantity={card.accounts?.physicalAbundance} evidence={card.evidence} library={library} />
+        <QuantityText label={accountLabel(t, 'totalReserves')} quantity={card.accounts?.totalReserves} evidence={card.evidence} library={library} />
+        <QuantityText label={accountLabel(t, 'recoverableReserves')} quantity={card.accounts?.recoverableReserves} evidence={card.evidence} library={library} />
+        <QuantityText label={accountLabel(t, 'supplyDeficit')} quantity={card.accounts?.supplyDeficit} evidence={card.evidence} library={library} />
         {card.accounts?.regional.map((region) => (
           <div key={region.id}>
-            <QuantityText label={t('card.savedAmount')} quantity={region.availability} evidence={card.evidence} />
-            <QuantityText label={t('card.savedDeficit')} quantity={region.supplyDeficit} evidence={card.evidence} />
+            <QuantityText label={t('card.savedAmount')} quantity={region.availability} evidence={card.evidence} library={library} />
+            <QuantityText label={t('card.savedDeficit')} quantity={region.supplyDeficit} evidence={card.evidence} library={library} />
           </div>
         ))}
       </section>
       <section className={styles.section}>
         <h2>{t('card.technology')}</h2>
-        {grouped(['operation']).map((quantity) => <QuantityText key={quantity.id} quantity={quantity} evidence={card.evidence} />)}
+        {grouped(['operation']).map((quantity) => <QuantityText key={quantity.id} quantity={quantity} evidence={card.evidence} library={library} />)}
         {card.kind === 'source' ? (
           <>
             <p>{produced.length === 0 ? t('card.producesNone') : t('card.produces', { name: produced.map((link) => nameOf(link.resourceId)).join(', ') })}</p>
-            <QuantityText label={accountLabel(t, 'productionVolume')} quantity={card.sourceProfile?.productionVolume} evidence={card.evidence} />
-            <QuantityText label={accountLabel(t, 'outputPerTime')} quantity={card.sourceProfile?.outputPerTime} evidence={card.evidence} />
-            <QuantityText label={accountLabel(t, 'maxCapacity')} quantity={card.sourceProfile?.maxCapacity} evidence={card.evidence} />
-            <QuantityText label={accountLabel(t, 'energyCost')} quantity={card.sourceProfile?.energyCost} evidence={card.evidence} />
-            <QuantityText label={accountLabel(t, 'efficiency')} quantity={card.sourceProfile?.efficiency} evidence={card.evidence} />
-            <QuantityText label={accountLabel(t, 'footprint')} quantity={card.sourceProfile?.footprint} evidence={card.evidence} />
+            <QuantityText label={accountLabel(t, 'productionVolume')} quantity={card.sourceProfile?.productionVolume} evidence={card.evidence} library={library} />
+            <QuantityText label={accountLabel(t, 'outputPerTime')} quantity={card.sourceProfile?.outputPerTime} evidence={card.evidence} library={library} />
+            <QuantityText label={accountLabel(t, 'maxCapacity')} quantity={card.sourceProfile?.maxCapacity} evidence={card.evidence} library={library} />
+            <QuantityText label={accountLabel(t, 'energyCost')} quantity={card.sourceProfile?.energyCost} evidence={card.evidence} library={library} />
+            <QuantityText label={accountLabel(t, 'efficiency')} quantity={card.sourceProfile?.efficiency} evidence={card.evidence} library={library} />
+            <QuantityText label={accountLabel(t, 'footprint')} quantity={card.sourceProfile?.footprint} evidence={card.evidence} library={library} />
             {card.sourceProfile?.operations ? <p>{t('card.labeled', { label: t('card.operations'), name: card.sourceProfile.operations })}</p> : null}
             {card.sourceProfile?.continuous === undefined ? null : <p>{t('card.continuousValue', { name: card.sourceProfile.continuous ? t('card.yes') : t('card.no') })}</p>}
             {card.sourceProfile?.naturalConditions ? <p>{t('card.labeled', { label: t('card.natural'), name: card.sourceProfile.naturalConditions })}</p> : null}
@@ -532,10 +563,10 @@ function CardView({ card, links, cards }: { card: CatalogCard; links: CatalogLin
         {card.kind === 'consumer' ? (
           <>
             <p>{used.length === 0 ? t('card.usesNone') : t('card.uses', { name: used.map((link) => nameOf(link.resourceId)).join(', ') })}</p>
-            <QuantityText label={accountLabel(t, 'quantityUsed')} quantity={card.consumerProfile?.quantityUsed} evidence={card.evidence} />
+            <QuantityText label={accountLabel(t, 'quantityUsed')} quantity={card.consumerProfile?.quantityUsed} evidence={card.evidence} library={library} />
             {card.consumerProfile?.timeUnit ? <p>{t('card.labeled', { label: t('card.timeUnit'), name: card.consumerProfile.timeUnit })}</p> : null}
-            <QuantityText label={accountLabel(t, 'peakLoad')} quantity={card.consumerProfile?.peakLoad} evidence={card.evidence} />
-            <QuantityText label={accountLabel(t, 'averageLoad')} quantity={card.consumerProfile?.averageLoad} evidence={card.evidence} />
+            <QuantityText label={accountLabel(t, 'peakLoad')} quantity={card.consumerProfile?.peakLoad} evidence={card.evidence} library={library} />
+            <QuantityText label={accountLabel(t, 'averageLoad')} quantity={card.consumerProfile?.averageLoad} evidence={card.evidence} library={library} />
             {card.consumerProfile ? <p>{t('card.servedValue', { name: card.consumerProfile.served === undefined || card.consumerProfile.served === null ? t('card.unknown') : String(card.consumerProfile.served) })}</p> : null}
             {card.consumerProfile?.operations ? <p>{t('card.labeled', { label: t('card.operations'), name: card.consumerProfile.operations })}</p> : null}
             {card.consumerProfile?.wasteProcessing ? <p>{t('card.labeled', { label: t('card.waste'), name: card.consumerProfile.wasteProcessing })}</p> : null}
@@ -548,17 +579,17 @@ function CardView({ card, links, cards }: { card: CatalogCard; links: CatalogLin
   )
 }
 
-function QuantityGroup({ title, quantities, evidence, empty }: { title: string; quantities: MeasuredQuantity[]; evidence: CatalogCard['evidence']; empty: string }) {
+function QuantityGroup({ title, quantities, evidence, empty, library }: { title: string; quantities: MeasuredQuantity[]; evidence: CatalogCard['evidence']; empty: string; library: QuantityLibrary }) {
   return (
     <section className={styles.section}>
       <h2>{title}</h2>
-      {quantities.length === 0 ? <p className={controls.muted}>{empty}</p> : quantities.map((quantity) => <QuantityText key={quantity.id} quantity={quantity} evidence={evidence} />)}
+      {quantities.length === 0 ? <p className={controls.muted}>{empty}</p> : quantities.map((quantity) => <QuantityText key={quantity.id} quantity={quantity} evidence={evidence} library={library} />)}
     </section>
   )
 }
 
-function QuantityText({ quantity, evidence, label }: { quantity?: MeasuredQuantity; evidence: CatalogCard['evidence']; label?: string }) {
-  const { t } = useI18n()
+function QuantityText({ quantity, evidence, label, library }: { quantity?: MeasuredQuantity; evidence: CatalogCard['evidence']; label?: string; library: QuantityLibrary }) {
+  const { language, t } = useI18n()
   if (!quantity) {
     return null
   }
@@ -567,18 +598,23 @@ function QuantityText({ quantity, evidence, label }: { quantity?: MeasuredQuanti
   const period = `${quantity.periodStart || '…'} — ${quantity.periodEnd || '…'}`
   return (
     <p>
-      {label ? `${label}: ` : ''}{quantity.name || t('card.characteristic')} · {value} {quantity.unit} · {quantityLabel(t, quantity.quantityKind)}
+      {label ? `${label}: ` : ''}{storedQuantityLabel(t, language, library, quantity)} · {value} {quantity.unit}{quantity.quantityKind ? ` · ${quantityLabel(t, quantity.quantityKind)}` : ''}
       {quantity.aspect ? ` · ${aspectLabel(t, quantity.aspect)}` : ''}
       {quantity.measuredAt ? ` · ${t('card.measured', { name: quantity.measuredAt })}` : ''}
       {quantity.periodStart || quantity.periodEnd ? ` · ${t('card.period', { name: period })}` : ''}
       {quantity.conditions ? ` · ${quantity.conditions}` : ''}
+      {quantity.method ? ` · ${quantity.method}` : ''}
+      {quantity.valueOrigin ? ` · ${t(`origin.${quantity.valueOrigin}`)}` : ''}
+      {quantity.uncertainty === undefined ? '' : ` ± ${quantity.uncertainty}`}
+      {quantity.lower !== undefined || quantity.upper !== undefined ? ` · ${quantity.lower ?? '…'}…${quantity.upper ?? '…'}` : ''}
+      {needsQuantityReview(quantity) ? ` · ${t('card.reviewQuantity')}` : ''}
       {study ? ` · ${study.title || t('card.untitledStudy')}` : ` · ${t('card.sourceMissing')}`}
     </p>
   )
 }
 
 function quantityHasContent(quantity: QuantityDraft): boolean {
-  return [quantity.name, quantity.valueText, quantity.unit, quantity.measuredAt, quantity.periodStart, quantity.periodEnd, quantity.conditions, quantity.evidenceId].some((value) => value.trim() !== '')
+  return [quantity.name, quantity.valueText, quantity.unit, quantity.propertyId, quantity.method, quantity.uncertaintyText, quantity.lowerText, quantity.upperText, quantity.textValue, quantity.measuredAt, quantity.periodStart, quantity.periodEnd, quantity.conditions, quantity.evidenceId].some((value) => value.trim() !== '')
 }
 
 function clearedQuantity(quantity: QuantityDraft): QuantityDraft {
@@ -586,19 +622,23 @@ function clearedQuantity(quantity: QuantityDraft): QuantityDraft {
 }
 
 function blankMeasurement(): QuantityDraft {
-  return {
-    id: newId('qty'),
-    name: '',
-    valueText: '',
-    unit: '',
-    quantityKind: 'mass',
-    measuredAt: '',
-    periodStart: '',
-    periodEnd: '',
-    conditions: '',
-    evidenceId: '',
-    aspect: '',
+  return blankQuantity(newId('qty'))
+}
+
+function draftQuantityLabel(t: ReturnType<typeof useI18n>['t'], language: 'en' | 'ru', library: QuantityLibrary, quantity: QuantityDraft): string {
+  const property = quantity.propertyId ? findProperty(library, quantity.propertyId) : undefined
+  if (property) {
+    return language === 'ru' ? property.name.ru : property.name.en
   }
+  return quantity.quantityKind ? quantityLabel(t, quantity.quantityKind) : t('card.reviewQuantity')
+}
+
+function storedQuantityLabel(t: ReturnType<typeof useI18n>['t'], language: 'en' | 'ru', library: QuantityLibrary, quantity: MeasuredQuantity): string {
+  const property = quantity.propertyId ? findProperty(library, quantity.propertyId) : undefined
+  if (property) {
+    return language === 'ru' ? property.name.ru : property.name.en
+  }
+  return quantity.name || t('card.characteristic')
 }
 
 function blankEvidence(): EvidenceDraft {
