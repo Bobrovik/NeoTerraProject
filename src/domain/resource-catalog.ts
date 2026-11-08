@@ -163,6 +163,8 @@ export type ResourceCatalog = {
 
 export type CatalogRead = { ok: true; catalog: ResourceCatalog } | { ok: false; message: CatalogMessageCode }
 
+export const catalogListPath = '/catalog'
+
 export function emptyResourceCatalog(): ResourceCatalog {
   return { version: resourceCatalogVersion, cards: [], links: [] }
 }
@@ -191,6 +193,42 @@ export function createCatalogCard(input: {
     quantities: [],
     evidence: [],
   }
+}
+
+export function deleteCatalogCard(catalog: ResourceCatalog, cardId: string): { ok: true; catalog: ResourceCatalog } | { ok: false; message: CatalogMessageCode } {
+  if (!catalog.cards.some((card) => card.id === cardId)) {
+    return catalogFailure('catalog.missing-card')
+  }
+  return {
+    ok: true,
+    catalog: {
+      version: catalog.version,
+      cards: catalog.cards.filter((card) => card.id !== cardId),
+      links: catalog.links.filter((link) => !linkCitesCard(link, cardId)),
+    },
+  }
+}
+
+export function deletionChoice(
+  choice: 'delete' | 'cancel',
+  catalog: ResourceCatalog,
+  cardId: string,
+): { ok: true; cancelled: boolean; catalog: ResourceCatalog } | { ok: false; message: CatalogMessageCode } {
+  if (choice === 'cancel') {
+    return { ok: true, cancelled: true, catalog }
+  }
+  const removed = deleteCatalogCard(catalog, cardId)
+  if (!removed.ok) {
+    return removed
+  }
+  return { ok: true, cancelled: false, catalog: removed.catalog }
+}
+
+function linkCitesCard(link: CatalogLink, cardId: string): boolean {
+  if (link.role === 'produces') {
+    return link.sourceId === cardId || link.resourceId === cardId
+  }
+  return link.consumerId === cardId || link.resourceId === cardId
 }
 
 export function parseResourceCatalog(value: unknown): CatalogRead {

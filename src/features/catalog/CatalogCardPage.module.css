@@ -2,6 +2,14 @@
 
 .heading, .actions, .choice { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; }
 
+.delete {
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--danger);
+  border-radius: 8px;
+  padding: 7px 12px;
+}
+
 .section {
   display: flex;
   flex-direction: column;

@@ -18,10 +18,11 @@ import { mergeQuantityLibraries } from '../../domain/quantity/library'
 import { needsQuantityReview } from '../../domain/quantity/legacy'
 import { CharacteristicFields } from './CharacteristicFields'
 import { QuantityLibraryContext, useQuantityLibrary } from './quantity-library-context'
-import type { CatalogCard, CatalogCardKind, CatalogLink, CharacteristicAspect, EvidenceStudyType, EvidenceVerification, MeasuredQuantity, QuantityKind, ResourceCatalog } from '../../domain/resource-catalog'
+import { catalogListPath, deletionChoice, type CatalogCard, type CatalogCardKind, type CatalogLink, type CharacteristicAspect, type EvidenceStudyType, type EvidenceVerification, type MeasuredQuantity, type QuantityKind, type ResourceCatalog } from '../../domain/resource-catalog'
 import { quantityKinds } from '../../domain/resource-catalog'
 import { accountLabel, aspectLabel, aspects, imageLabel, kindLabel, priorityLabel, priorities, quantityLabel, scarcityLabel, scarcities, statusLabel, statuses, studyLabel, studyTypes, verificationLabel, verifications } from '../../shared/i18n/catalog-labels'
 import { useI18n } from '../../shared/i18n/useI18n'
+import { ConfirmDialog } from '../../shared/ui/ConfirmDialog'
 import { EmptyState, ErrorState } from '../../shared/ui/Status'
 import controls from '../../shared/ui/controls.module.css'
 import styles from './CatalogCardPage.module.css'
@@ -43,6 +44,7 @@ export function CatalogCardPage({ mode }: { mode: 'new' | 'existing' }) {
   const [draft, setDraft] = useState<CardDraft | null>(() => initialDraft(mode, cardId, library))
   const [editing, setEditing] = useState(mode === 'new')
   const [message, setMessage] = useState<string | undefined>()
+  const [pendingDelete, setPendingDelete] = useState(false)
 
   if (!stored.ok) {
     return <ErrorState title={t('catalog.readTitle')} detail={t(stored.message)} />
@@ -94,6 +96,27 @@ export function CatalogCardPage({ mode }: { mode: 'new' | 'existing' }) {
     }
   }
 
+  function finishDelete(choice: 'delete' | 'cancel') {
+    if (!stored.ok || !card) {
+      return
+    }
+    const result = deletionChoice(choice, stored.catalog, card.id)
+    setPendingDelete(false)
+    if (!result.ok) {
+      setMessage(t(result.message))
+      return
+    }
+    if (result.cancelled) {
+      return
+    }
+    const written = writeResourceCatalog(localStorage, result.catalog)
+    if (!written.ok) {
+      setMessage(t(written.message))
+      return
+    }
+    navigate(catalogListPath)
+  }
+
   function cancel() {
     if (mode === 'new') {
       navigate('/catalog')
@@ -123,9 +146,21 @@ export function CatalogCardPage({ mode }: { mode: 'new' | 'existing' }) {
           ) : (
             <button className={controls.button} type="button" onClick={() => setEditing(true)}>{t('card.edit')}</button>
           )}
+          {card ? <button className={styles.delete} type="button" onClick={() => setPendingDelete(true)}>{t('catalog.delete')}</button> : null}
         </div>
       </header>
       {message ? <p className={controls.error} role="alert">{message}</p> : null}
+      {pendingDelete && card ? (
+        <ConfirmDialog
+          title={t('catalog.deleteTitle')}
+          confirmLabel={t('catalog.deleteConfirm')}
+          cancelLabel={t('catalog.deleteCancel')}
+          onConfirm={() => finishDelete('delete')}
+          onCancel={() => finishDelete('cancel')}
+        >
+          {t('catalog.deleteWarning', { name: card.name.trim() || t('catalog.untitled') })}
+        </ConfirmDialog>
+      ) : null}
       {editing ? (
         <CardForm draft={draft} catalog={catalog} library={library} userLibrary={userLibrary} libraryMessage={libraryRead.ok ? undefined : t(libraryRead.code)} onLibrary={(next) => setLibraryRead({ ok: true, library: next })} onChange={setDraft} />
       ) : card ? (

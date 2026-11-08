@@ -16,6 +16,19 @@
 
 .list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
 
+.entry { display: flex; align-items: flex-start; gap: 8px; }
+
+.entry .card { flex: 1; }
+
+.delete {
+  border: 1px solid var(--line);
+  background: var(--bg-raised);
+  color: var(--danger);
+  border-radius: 8px;
+  padding: 7px 12px;
+  margin-top: 14px;
+}
+
 .card {
   display: flex;
   flex-direction: column;

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router'
-import { readResourceCatalog } from '../../data/resource-catalog-storage'
-import type { CardStatus, CatalogCardKind, Priority, Scarcity } from '../../domain/resource-catalog'
+import { readResourceCatalog, writeResourceCatalog } from '../../data/resource-catalog-storage'
+import { deletionChoice, type CatalogCard, type CardStatus, type CatalogCardKind, type Priority, type Scarcity } from '../../domain/resource-catalog'
 import {
   catalogCategories,
   countCardsByKind,
@@ -11,6 +11,7 @@ import {
 } from '../../domain/resource-catalog-view'
 import { kindLabel, priorities, priorityLabel, scarcities, scarcityLabel, statuses, statusLabel } from '../../shared/i18n/catalog-labels'
 import { useI18n } from '../../shared/i18n/useI18n'
+import { ConfirmDialog } from '../../shared/ui/ConfirmDialog'
 import { EmptyState, ErrorState } from '../../shared/ui/Status'
 import controls from '../../shared/ui/controls.module.css'
 import styles from './CatalogPage.module.css'
@@ -39,17 +40,44 @@ function KindMark({ kind }: { kind: CatalogCardKind }) {
 
 export function CatalogPage() {
   const { t } = useI18n()
-  const [stored] = useState(() => readResourceCatalog(localStorage))
+  const [stored, setStored] = useState(() => readResourceCatalog(localStorage))
   const [query, setQuery] = useState<CatalogListQuery>(initialQuery)
+  const [pending, setPending] = useState<CatalogCard | null>(null)
+  const [message, setMessage] = useState<string | undefined>()
 
   if (!stored.ok) {
     return <ErrorState title={t('catalog.readTitle')} detail={t(stored.message)} />
   }
 
-  const counts = countCardsByKind(stored.catalog.cards)
-  const categories = catalogCategories(stored.catalog.cards)
-  const cards = listCatalogCards(stored.catalog.cards, query)
+  const catalog = stored.catalog
+  const counts = countCardsByKind(catalog.cards)
+  const categories = catalogCategories(catalog.cards)
+  const cards = listCatalogCards(catalog.cards, query)
   const update = (patch: Partial<CatalogListQuery>) => setQuery((current) => ({ ...current, ...patch }))
+
+  function finishDelete(choice: 'delete' | 'cancel') {
+    if (!pending) {
+      return
+    }
+    const result = deletionChoice(choice, catalog, pending.id)
+    if (!result.ok) {
+      setMessage(t(result.message))
+      setPending(null)
+      return
+    }
+    if (result.cancelled) {
+      setPending(null)
+      return
+    }
+    const written = writeResourceCatalog(localStorage, result.catalog)
+    if (!written.ok) {
+      setMessage(t(written.message))
+      return
+    }
+    setStored(written)
+    setPending(null)
+    setMessage(undefined)
+  }
 
   return (
     <div className={styles.page}>
@@ -122,16 +150,17 @@ export function CatalogPage() {
           </select>
         </label>
       </div>
-      {stored.catalog.cards.length === 0 ? (
+      {message ? <p className={controls.error} role="alert">{message}</p> : null}
+      {catalog.cards.length === 0 ? (
         <EmptyState title={t('catalog.emptyTitle')} detail={t('catalog.emptyDetail')} />
       ) : null}
-      {stored.catalog.cards.length > 0 && cards.length === 0 ? (
+      {catalog.cards.length > 0 && cards.length === 0 ? (
         <EmptyState title={t('catalog.noMatchTitle')} detail={t('catalog.noMatchDetail')} />
       ) : null}
       {cards.length > 0 ? (
         <ul className={styles.list}>
           {cards.map((card) => (
-            <li key={card.id}>
+            <li key={card.id} className={styles.entry}>
               <Link className={styles.card} to={`/catalog/${card.id}`}>
               <strong>{card.name.trim() || t('catalog.untitled')}</strong>
               <div className={styles.meta}>
@@ -143,9 +172,21 @@ export function CatalogPage() {
               </div>
               {card.summary ? <p>{card.summary}</p> : null}
               </Link>
+              <button className={styles.delete} type="button" onClick={() => setPending(card)}>{t('catalog.delete')}</button>
             </li>
           ))}
         </ul>
+      ) : null}
+      {pending ? (
+        <ConfirmDialog
+          title={t('catalog.deleteTitle')}
+          confirmLabel={t('catalog.deleteConfirm')}
+          cancelLabel={t('catalog.deleteCancel')}
+          onConfirm={() => finishDelete('delete')}
+          onCancel={() => finishDelete('cancel')}
+        >
+          {t('catalog.deleteWarning', { name: pending.name.trim() || t('catalog.untitled') })}
+        </ConfirmDialog>
       ) : null}
     </div>
   )

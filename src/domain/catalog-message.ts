@@ -3,6 +3,7 @@ export const catalogMessageCodes = [
   'catalog.version',
   'catalog.missing-lists',
   'catalog.repeat-card',
+  'catalog.missing-card',
   'catalog.repeat-link',
   'card.not-object',
   'card.missing-text',

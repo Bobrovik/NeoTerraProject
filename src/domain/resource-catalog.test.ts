@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { layoutStorageKey } from '../data/layout-storage'
+import { quantityLibraryStorageKey, writeQuantityLibrary } from '../data/quantity-library-storage'
 import { readResourceCatalog, resourceCatalogStorageKey, writeResourceCatalog, type CatalogStore } from '../data/resource-catalog-storage'
 import { needsQuantityReview } from './quantity/legacy'
-import { createCatalogCard, parseResourceCatalog, type CatalogCard, type Evidence, type MeasuredQuantity } from './resource-catalog'
+import { builtinQuantityLibrary } from './quantity/library'
+import { createPropertyDefinition } from './quantity/validate'
+import { catalogListPath, createCatalogCard, deleteCatalogCard, deletionChoice, parseResourceCatalog, type CatalogCard, type Evidence, type MeasuredQuantity, type ResourceCatalog } from './resource-catalog'
 
 function memoryStore(initial: Record<string, string> = {}): CatalogStore & { data: Record<string, string> } {
   const data = { ...initial }
@@ -278,6 +281,105 @@ describe('resource catalog links', () => {
     })
     expect(missing.ok).toBe(false)
     expect(swapped.ok).toBe(false)
+  })
+})
+
+describe('catalog card deletion', () => {
+  function linked(): ResourceCatalog {
+    const water = card('resource', 'card:water', 'Water')
+    water.quantities = [quantity({ id: 'qty:density', name: 'Density', quantityKind: 'density', unit: 'kg/m3', value: 998, propertyId: 'property:density' })]
+    water.evidence = [{ id: 'evidence:water', title: 'Water note', author: 'Lab', year: null, url: null, studyType: 'study', supports: 'Density', verification: 'unreviewed' }]
+    const ore = card('resource', 'card:ore', 'Ore')
+    ore.quantities = [quantity({ id: 'qty:ore', name: 'Mass', quantityKind: 'mass', unit: 't', value: 12 })]
+    const basin = card('source', 'card:basin', 'Basin')
+    const plant = card('consumer', 'card:plant', 'Plant')
+    return {
+      version: 1,
+      cards: [water, ore, basin, plant],
+      links: [
+        { id: 'link:basin-water', role: 'produces', sourceId: 'card:basin', resourceId: 'card:water' },
+        { id: 'link:plant-water', role: 'uses', consumerId: 'card:plant', resourceId: 'card:water' },
+        { id: 'link:basin-ore', role: 'produces', sourceId: 'card:basin', resourceId: 'card:ore' },
+      ],
+    }
+  }
+
+  it('removes one card of each kind and only the links that cite it', () => {
+    const resource = deleteCatalogCard(linked(), 'card:water')
+    expect(resource.ok).toBe(true)
+    if (!resource.ok) {
+      return
+    }
+    expect(resource.catalog.cards.map((item) => item.id)).toEqual(['card:ore', 'card:basin', 'card:plant'])
+    expect(resource.catalog.links.map((item) => item.id)).toEqual(['link:basin-ore'])
+    expect(resource.catalog.cards.find((item) => item.id === 'card:ore')?.quantities).toEqual(linked().cards.find((item) => item.id === 'card:ore')?.quantities)
+
+    const source = deleteCatalogCard(linked(), 'card:basin')
+    expect(source.ok && source.catalog.cards.map((item) => item.id)).toEqual(['card:water', 'card:ore', 'card:plant'])
+    expect(source.ok && source.catalog.links.map((item) => item.id)).toEqual(['link:plant-water'])
+    expect(source.ok && source.catalog.cards.find((item) => item.id === 'card:water')?.evidence[0]?.id).toBe('evidence:water')
+
+    const consumer = deleteCatalogCard(linked(), 'card:plant')
+    expect(consumer.ok && consumer.catalog.cards.map((item) => item.id)).toEqual(['card:water', 'card:ore', 'card:basin'])
+    expect(consumer.ok && consumer.catalog.links.map((item) => item.id)).toEqual(['link:basin-water', 'link:basin-ore'])
+  })
+
+  it('leaves a missing id unchanged and keeps the catalog list as the page after deletion', () => {
+    const catalog = linked()
+    const missing = deleteCatalogCard(catalog, 'card:missing')
+    expect(missing).toEqual({ ok: false, message: 'catalog.missing-card' })
+    expect(catalog.cards).toHaveLength(4)
+    expect(catalogListPath).toBe('/catalog')
+  })
+
+  it('cancels without changing the catalog', () => {
+    const catalog = linked()
+    const cancelled = deletionChoice('cancel', catalog, 'card:water')
+    expect(cancelled).toEqual({ ok: true, cancelled: true, catalog })
+    expect(cancelled.ok && cancelled.catalog.links).toHaveLength(3)
+  })
+
+  it('saves the deletion and leaves the quantity library and city layouts in place', () => {
+    const cityFile = '{"version":2,"drafts":[],"cities":[]}'
+    const store = memoryStore({ [layoutStorageKey]: cityFile })
+    const soil = createPropertyDefinition({
+      id: 'property:user:soil',
+      name: { en: 'Soil filtration coefficient', ru: 'Коэффициент фильтрации почвы' },
+      description: { en: 'Filtration.', ru: 'Фильтрация.' },
+      category: 'environmental',
+      dataType: 'number',
+      quantityId: 'quantity:velocity',
+      recommendedUnitId: 'unit:m-s',
+      permittedUnitIds: [],
+      conditions: '',
+      minimum: null,
+      maximum: null,
+      status: 'user',
+    }, builtinQuantityLibrary)
+    expect(soil.ok).toBe(true)
+    if (!soil.ok) {
+      return
+    }
+    const library = writeQuantityLibrary(store, { properties: [soil.property], quantities: [], units: [] })
+    expect(library.ok).toBe(true)
+    const libraryText = store.data[quantityLibraryStorageKey]
+    const saved = writeResourceCatalog(store, linked())
+    expect(saved.ok).toBe(true)
+    if (!saved.ok) {
+      return
+    }
+    const removed = deleteCatalogCard(saved.catalog, 'card:water')
+    expect(removed.ok).toBe(true)
+    if (!removed.ok) {
+      return
+    }
+    const written = writeResourceCatalog(store, removed.catalog)
+    const read = readResourceCatalog(store)
+    expect(read).toEqual(written)
+    expect(read.ok && read.catalog.cards.map((item) => item.id)).toEqual(['card:ore', 'card:basin', 'card:plant'])
+    expect(read.ok && read.catalog.cards.find((item) => item.id === 'card:ore')?.quantities[0]?.value).toBe(12)
+    expect(store.data[quantityLibraryStorageKey]).toBe(libraryText)
+    expect(store.data[layoutStorageKey]).toBe(cityFile)
   })
 })
 
