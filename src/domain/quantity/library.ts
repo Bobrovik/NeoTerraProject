@@ -2,6 +2,8 @@ import { dimension, type Dimension } from './dimension'
 import {
   affineUnit,
   definedUnit,
+  findQuantity,
+  unitsForProperty,
   type LocalizedName,
   type PropertyDefinition,
   type QuantityDefinition,
@@ -32,6 +34,7 @@ const massFlow = dimension({ M: 1, T: -1 })
 const frequency = dimension({ T: -1 })
 const conductivity = dimension({ I: 2, T: 3, M: -1, L: -3 })
 const activityConcentration = dimension({ T: -1, L: -3 })
+const specificHeat = dimension({ L: 2, T: -2, Th: -1 })
 
 function quantity(id: string, name: LocalizedName, description: LocalizedName, value: Dimension, unitId: string, temperatureRole: QuantityDefinition['temperatureRole'] = 'none'): QuantityDefinition {
   return { id, name, description, dimension: value, recommendedUnitId: unitId, temperatureRole, status: 'library' }
@@ -104,6 +107,7 @@ const units: UnitDefinition[] = [
   definedUnit({ id: 'unit:pH', symbol: 'pH', name: text('pH', 'pH') }),
   definedUnit({ id: 'unit:NTU', symbol: 'NTU', name: text('nephelometric turbidity unit', 'нефелометрическая единица мутности') }),
   definedUnit({ id: 'unit:CFU-100mL', symbol: 'CFU/100 mL', name: text('colony forming units per 100 millilitres', 'колониеобразующие единицы на 100 миллилитров') }),
+  affineUnit({ id: 'unit:J-kg-K', symbol: 'J/(kg·K)', name: text('joule per kilogram kelvin', 'джоуль на килограмм-кельвин'), dimension: specificHeat, factor: 1 }),
 ]
 
 const quantities: QuantityDefinition[] = [
@@ -133,16 +137,21 @@ const quantities: QuantityDefinition[] = [
   quantity('quantity:ph', text('pH', 'pH'), text('Logarithmic measure of hydrogen ion activity. It is not a concentration.', 'Логарифмическая мера активности ионов водорода. Это не концентрация.'), dimension(), 'unit:pH'),
   quantity('quantity:turbidity', text('Turbidity', 'Мутность'), text('Optical scattering reported by a stated method. NTU is not converted to an SI unit.', 'Рассеяние света по указанной методике. NTU не переводится в единицу СИ.'), dimension(), 'unit:NTU'),
   quantity('quantity:colony-count', text('Colony count', 'Число колоний'), text('A microbiological count for a stated volume and method.', 'Микробиологический счёт для указанного объёма и метода.'), dimension(), 'unit:CFU-100mL'),
+  quantity('quantity:specific-heat', text('Specific heat capacity', 'Удельная теплоёмкость'), text('Energy needed to raise the temperature of a mass by one temperature interval.', 'Энергия на повышение температуры массы на один интервал температуры.'), specificHeat, 'unit:J-kg-K'),
 ]
 
 const properties: PropertyDefinition[] = [
-  property({ id: 'property:density', name: text('Density', 'Плотность'), description: text('Mass per volume.', 'Масса в объёме.'), category: 'physical', dataType: 'number', quantityId: 'quantity:density', recommendedUnitId: 'unit:kg-m3' }),
+  property({ id: 'property:density', name: text('Density', 'Плотность'), description: text('Mass per volume of the material itself.', 'Масса материала в его объёме.'), category: 'physical', dataType: 'number', quantityId: 'quantity:density', recommendedUnitId: 'unit:kg-m3', permittedUnitIds: ['unit:kg-m3'] }),
   property({ id: 'property:dynamic-viscosity', name: text('Dynamic viscosity', 'Динамическая вязкость'), description: text('Shear resistance of a fluid.', 'Сопротивление жидкости сдвигу.'), category: 'physical', dataType: 'number', quantityId: 'quantity:dynamic-viscosity', recommendedUnitId: 'unit:Pa-s' }),
   property({ id: 'property:temperature', name: text('Temperature', 'Температура'), description: text('Absolute temperature of the sample.', 'Абсолютная температура образца.'), category: 'physical', dataType: 'number', quantityId: 'quantity:temperature', recommendedUnitId: 'unit:C' }),
-  property({ id: 'property:ph', name: text('pH', 'pH'), description: text('Hydrogen ion activity on the logarithmic pH scale.', 'Активность ионов водорода в логарифмической шкале pH.'), category: 'chemical', dataType: 'number', quantityId: 'quantity:ph', recommendedUnitId: 'unit:pH', permittedUnitIds: ['unit:pH'] }),
-  property({ id: 'property:conductivity', name: text('Electrical conductivity', 'Электрическая проводимость'), description: text('Electrical conductivity of the sample.', 'Электрическая проводимость образца.'), category: 'physical', dataType: 'number', quantityId: 'quantity:conductivity', recommendedUnitId: 'unit:S-m' }),
-  property({ id: 'property:concentration', name: text('Substance concentration', 'Концентрация вещества'), description: text('Mass of a named substance in a volume. Name the substance in the measurement.', 'Масса названного вещества в объёме. Название вещества записывается в измерении.'), category: 'chemical', dataType: 'number', quantityId: 'quantity:density', recommendedUnitId: 'unit:mg-L' }),
-  property({ id: 'property:turbidity', name: text('Turbidity', 'Мутность'), description: text('Turbidity by the method named on the measurement.', 'Мутность по методу, указанному в измерении.'), category: 'environmental', dataType: 'number', quantityId: 'quantity:turbidity', recommendedUnitId: 'unit:NTU', permittedUnitIds: ['unit:NTU'] }),
+  property({ id: 'property:specific-heat', name: text('Specific heat capacity', 'Удельная теплоёмкость'), description: text('Energy required to warm a mass by one temperature interval.', 'Энергия для нагрева массы на один интервал температуры.'), category: 'energy', dataType: 'number', quantityId: 'quantity:specific-heat', recommendedUnitId: 'unit:J-kg-K', permittedUnitIds: ['unit:J-kg-K'] }),
+  property({ id: 'property:ph', name: text('pH', 'pH'), description: text('Hydrogen ion activity on the logarithmic pH scale.', 'Активность ионов водорода в логарифмической шкале pH.'), category: 'quality', dataType: 'number', quantityId: 'quantity:ph', recommendedUnitId: 'unit:pH', permittedUnitIds: ['unit:pH'] }),
+  property({ id: 'property:conductivity', name: text('Electrical conductivity', 'Электрическая проводимость'), description: text('Electrical conductivity of the sample.', 'Электрическая проводимость образца.'), category: 'physical', dataType: 'number', quantityId: 'quantity:conductivity', recommendedUnitId: 'unit:S-m', permittedUnitIds: ['unit:S-m'] }),
+  property({ id: 'property:concentration', name: text('Substance concentration', 'Концентрация вещества'), description: text('Mass of one named substance in a volume. The property names the substance. It is not the density of the mixture.', 'Масса одного названного вещества в объёме. Свойство называет вещество. Это не плотность смеси.'), category: 'chemical', dataType: 'number', quantityId: 'quantity:density', recommendedUnitId: 'unit:mg-L', permittedUnitIds: ['unit:mg-L', 'unit:ug-L'] }),
+  property({ id: 'property:nitrates', name: text('Nitrates', 'Нитраты'), description: text('Mass concentration of nitrate. The same dimension as density does not make this density.', 'Массовая концентрация нитрата. Та же размерность, что у плотности, не делает это плотностью.'), category: 'chemical', dataType: 'number', quantityId: 'quantity:density', recommendedUnitId: 'unit:mg-L', permittedUnitIds: ['unit:mg-L', 'unit:ug-L'] }),
+  property({ id: 'property:heavy-metals', name: text('Heavy metal content', 'Содержание тяжёлых металлов'), description: text('Mass concentration of a named heavy metal. It is not interchangeable with density.', 'Массовая концентрация названного тяжёлого металла. Она не взаимозаменяема с плотностью.'), category: 'chemical', dataType: 'number', quantityId: 'quantity:density', recommendedUnitId: 'unit:mg-L', permittedUnitIds: ['unit:mg-L', 'unit:ug-L'] }),
+  property({ id: 'property:turbidity', name: text('Turbidity', 'Мутность'), description: text('Turbidity by the method named on the measurement.', 'Мутность по методу, указанному в измерении.'), category: 'quality', dataType: 'number', quantityId: 'quantity:turbidity', recommendedUnitId: 'unit:NTU', permittedUnitIds: ['unit:NTU'] }),
+  property({ id: 'property:microorganisms', name: text('Microorganisms', 'Микроорганизмы'), description: text('A colony count for the stated volume and method. CFU/100 mL is not converted to an SI unit.', 'Счёт колоний для указанного объёма и метода. CFU/100 mL не переводится в единицу СИ.'), category: 'quality', dataType: 'number', quantityId: 'quantity:colony-count', recommendedUnitId: 'unit:CFU-100mL', permittedUnitIds: ['unit:CFU-100mL'] }),
   property({ id: 'property:length', name: text('Length', 'Длина'), description: text('A length of a technological part.', 'Длина технологической части.'), category: 'technological', dataType: 'number', quantityId: 'quantity:length', recommendedUnitId: 'unit:m' }),
   property({ id: 'property:diameter', name: text('Internal diameter', 'Внутренний диаметр'), description: text('Internal diameter of a conduit.', 'Внутренний диаметр канала.'), category: 'technological', dataType: 'number', quantityId: 'quantity:length', recommendedUnitId: 'unit:m' }),
   property({ id: 'property:roughness', name: text('Roughness', 'Шероховатость'), description: text('Absolute wall roughness.', 'Абсолютная шероховатость стенки.'), category: 'mechanical', dataType: 'number', quantityId: 'quantity:length', recommendedUnitId: 'unit:m' }),
@@ -163,13 +172,31 @@ export function mergeQuantityLibraries(user: QuantityLibrary): QuantityLibrary {
   }
 }
 
-export function searchProperties(library: QuantityLibrary, textQuery: string): PropertyDefinition[] {
+export function searchProperties(
+  library: QuantityLibrary,
+  textQuery: string,
+  filters: { category?: string; quantityId?: string } = {},
+): PropertyDefinition[] {
   const needle = textQuery.trim().toLowerCase()
-  if (!needle) {
-    return library.properties
-  }
   return library.properties.filter((property) => {
-    const haystack = [property.name.en, property.name.ru, property.description.en, property.description.ru, property.category].join('\n').toLowerCase()
+    if (filters.category && property.category !== filters.category) {
+      return false
+    }
+    if (filters.quantityId && property.quantityId !== filters.quantityId) {
+      return false
+    }
+    if (!needle) {
+      return true
+    }
+    const quantity = findQuantity(library, property.quantityId)
+    const units = unitsForProperty(library, property)
+    const names = [property.name.en, property.name.ru, quantity?.name.en, quantity?.name.ru]
+    const symbols = units.flatMap((unit) => [unit.symbol, unit.name.en, unit.name.ru])
+    if (needle.length < 4) {
+      const tokens = [...names, ...symbols].flatMap((value) => value?.toLowerCase().split(/[^\p{L}\p{N}]+/u) ?? [])
+      return tokens.includes(needle) || symbols.some((value) => value.toLowerCase() === needle)
+    }
+    const haystack = [...names, property.description.en, property.description.ru, property.category, ...symbols].join('\n').toLowerCase()
     return haystack.includes(needle)
   })
 }

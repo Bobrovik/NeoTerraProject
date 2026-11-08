@@ -20,6 +20,8 @@
   background: var(--bg-raised);
 }
 
+.wide { width: min(720px, 100%); max-height: min(640px, 100%); overflow: auto; }
+
 .dialog h2 { margin: 0; font-size: 1.15rem; }
 
 .actions { display: flex; justify-content: flex-end; gap: 8px; }

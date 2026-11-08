@@ -111,7 +111,7 @@ export function blankQuantity(id: string): QuantityDraft {
     name: '',
     valueText: '',
     unit: '',
-    quantityKind: 'mass',
+    quantityKind: '',
     propertyId: '',
     quantityId: '',
     unitId: '',

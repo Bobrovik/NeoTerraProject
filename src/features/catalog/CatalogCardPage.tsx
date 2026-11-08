@@ -18,9 +18,8 @@ import { mergeQuantityLibraries } from '../../domain/quantity/library'
 import { needsQuantityReview } from '../../domain/quantity/legacy'
 import { CharacteristicFields } from './CharacteristicFields'
 import { QuantityLibraryContext, useQuantityLibrary } from './quantity-library-context'
-import { catalogListPath, deletionChoice, type CatalogCard, type CatalogCardKind, type CatalogLink, type CharacteristicAspect, type EvidenceStudyType, type EvidenceVerification, type MeasuredQuantity, type QuantityKind, type ResourceCatalog } from '../../domain/resource-catalog'
-import { quantityKinds } from '../../domain/resource-catalog'
-import { accountLabel, aspectLabel, aspects, imageLabel, kindLabel, priorityLabel, priorities, quantityLabel, scarcityLabel, scarcities, statusLabel, statuses, studyLabel, studyTypes, verificationLabel, verifications } from '../../shared/i18n/catalog-labels'
+import { catalogListPath, deletionChoice, type CatalogCard, type CatalogCardKind, type CatalogLink, type CharacteristicAspect, type EvidenceStudyType, type EvidenceVerification, type MeasuredQuantity, type ResourceCatalog } from '../../domain/resource-catalog'
+import { accountLabel, aspectLabel, imageLabel, kindLabel, priorityLabel, priorities, quantityLabel, scarcityLabel, scarcities, statusLabel, statuses, studyLabel, studyTypes, verificationLabel, verifications } from '../../shared/i18n/catalog-labels'
 import { useI18n } from '../../shared/i18n/useI18n'
 import { ConfirmDialog } from '../../shared/ui/ConfirmDialog'
 import { EmptyState, ErrorState } from '../../shared/ui/Status'
@@ -389,7 +388,8 @@ function QuantityEditor({ quantity, evidence, label, onChange, onRemove }: {
   const study = quantity.evidenceId ? evidence.find((item) => item.id === quantity.evidenceId) : undefined
   const sourceName = quantity.evidenceId ? (study?.title.trim() || t('card.untitledStudy')) : t('card.sourceMissing')
   const value = quantity.valueText.trim() === '' ? t('card.unknownValue') : quantity.valueText.trim()
-  const title = label || quantity.name.trim() || t('card.characteristic')
+  const definedLabel = draftQuantityLabel(t, language, library, quantity)
+  const title = label || (quantity.propertyId ? definedLabel : quantity.name.trim() || t('card.characteristic'))
 
   if (!recorded && !open) {
     return (
@@ -408,7 +408,7 @@ function QuantityEditor({ quantity, evidence, label, onChange, onRemove }: {
       <div className={styles.measureHead}>
         <div>
           <strong>{title}</strong>
-          <p>{quantity.name.trim() || t('catalog.untitled')} · {value}{quantity.unit.trim() ? ` ${quantity.unit.trim()}` : ''} · {draftQuantityLabel(t, language, library, quantity)}{quantity.aspect ? ` · ${aspectLabel(t, quantity.aspect)}` : ''}</p>
+          <p>{quantity.propertyId ? definedLabel : (quantity.name.trim() || t('catalog.untitled'))} · {value}{quantity.unit.trim() ? ` ${quantity.unit.trim()}` : ''}{quantity.propertyId ? '' : ` · ${definedLabel}`}{quantity.aspect ? ` · ${aspectLabel(t, quantity.aspect)}` : ''}</p>
           <p className={controls.muted}>{sourceName}</p>
         </div>
         <div className={styles.actions}>
@@ -418,54 +418,7 @@ function QuantityEditor({ quantity, evidence, label, onChange, onRemove }: {
         </div>
       </div>
       {open ? (
-        <>
-          <div className={styles.grid}>
-            <label className={controls.stack}>{t('card.name')}<input className={controls.field} value={quantity.name} onChange={(event) => patch({ name: event.target.value })} /></label>
-            <label className={controls.stack}>{t('card.value')}<input className={controls.field} value={quantity.valueText} onChange={(event) => patch({ valueText: event.target.value })} placeholder={t('card.servedEmpty')} /></label>
-            {quantity.propertyId ? null : (
-              <>
-                <label className={controls.stack}>{t('card.unit')}<input className={controls.field} value={quantity.unit} onChange={(event) => patch({ unit: event.target.value })} /></label>
-                <label className={controls.stack}>
-                  {t('card.quantityKind')}
-                  <select className={controls.select} value={quantity.quantityKind} onChange={(event) => patch({ quantityKind: event.target.value as QuantityKind })}>
-                    {quantityKinds.map((kind) => <option key={kind} value={kind}>{quantityLabel(t, kind)}</option>)}
-                  </select>
-                </label>
-              </>
-            )}
-            <CharacteristicFields quantity={quantity} library={library} userLibrary={userLibrary} libraryMessage={libraryMessage} onChange={patch} onUserLibrary={onLibrary} />
-            <label className={controls.stack}>
-              {t('card.group')}
-              <select className={controls.select} value={quantity.aspect} onChange={(event) => patch({ aspect: event.target.value as CharacteristicAspect })}>
-                <option value="">{t('aspect.metric')}</option>
-                {aspects.map((aspect) => <option key={aspect} value={aspect}>{aspectLabel(t, aspect)}</option>)}
-              </select>
-            </label>
-            <label className={`${controls.stack} ${styles.wide}`}>
-              {t('card.dataSource')}
-              <select className={controls.select} value={quantity.evidenceId} onChange={(event) => patch({ evidenceId: event.target.value })}>
-                <option value="">{t('card.sourceMissing')}</option>
-                {evidence.map((item) => <option key={item.id} value={item.id}>{item.title.trim() || t('card.untitledStudy')}</option>)}
-              </select>
-            </label>
-          </div>
-          <details className={styles.extra}>
-            <summary>{t('card.extra')}</summary>
-            <div className={styles.grid}>
-              <label className={controls.stack}>{t('card.measuredAt')}<input className={controls.field} value={quantity.measuredAt} onChange={(event) => patch({ measuredAt: event.target.value })} /></label>
-              <label className={controls.stack}>{t('card.periodStart')}<input className={controls.field} value={quantity.periodStart} onChange={(event) => patch({ periodStart: event.target.value })} /></label>
-              <label className={controls.stack}>{t('card.periodEnd')}<input className={controls.field} value={quantity.periodEnd} onChange={(event) => patch({ periodEnd: event.target.value })} /></label>
-              <label className={controls.stack}>{t('card.method')}<input className={controls.field} value={quantity.method} onChange={(event) => patch({ method: event.target.value })} /></label>
-              <label className={controls.stack}>{t('card.uncertainty')}<input className={controls.field} value={quantity.uncertaintyText} onChange={(event) => patch({ uncertaintyText: event.target.value })} /></label>
-              <label className={controls.stack}>{t('card.lower')}<input className={controls.field} value={quantity.lowerText} onChange={(event) => patch({ lowerText: event.target.value })} /></label>
-              <label className={controls.stack}>{t('card.upper')}<input className={controls.field} value={quantity.upperText} onChange={(event) => patch({ upperText: event.target.value })} /></label>
-              <label className={controls.stack}>{t('card.textValue')}<input className={controls.field} value={quantity.textValue} onChange={(event) => patch({ textValue: event.target.value })} /></label>
-              <label className={controls.stack}>{t('card.conditionTemperature')}<input className={controls.field} value={quantity.conditionTemperatureText} onChange={(event) => patch({ conditionTemperatureText: event.target.value, conditionTemperatureUnitId: quantity.conditionTemperatureUnitId || 'unit:C' })} /></label>
-              <label className={controls.stack}>{t('card.conditionPressure')}<input className={controls.field} value={quantity.conditionPressureText} onChange={(event) => patch({ conditionPressureText: event.target.value, conditionPressureUnitId: quantity.conditionPressureUnitId || 'unit:Pa' })} /></label>
-              <label className={`${controls.stack} ${styles.wide}`}>{t('card.conditions')}<textarea className={controls.area} value={quantity.conditions} onChange={(event) => patch({ conditions: event.target.value })} /></label>
-            </div>
-          </details>
-        </>
+        <CharacteristicFields quantity={quantity} evidence={evidence} library={library} userLibrary={userLibrary} libraryMessage={libraryMessage} onChange={patch} onUserLibrary={onLibrary} />
       ) : null}
     </div>
   )
@@ -633,7 +586,7 @@ function QuantityText({ quantity, evidence, label, library }: { quantity?: Measu
   const period = `${quantity.periodStart || '…'} — ${quantity.periodEnd || '…'}`
   return (
     <p>
-      {label ? `${label}: ` : ''}{storedQuantityLabel(t, language, library, quantity)} · {value} {quantity.unit}{quantity.quantityKind ? ` · ${quantityLabel(t, quantity.quantityKind)}` : ''}
+      {label ? `${label}: ` : ''}{storedQuantityLabel(t, language, library, quantity)} · {value} {quantity.unit}{needsQuantityReview(quantity) && quantity.quantityKind ? ` · ${quantityLabel(t, quantity.quantityKind)}` : ''}
       {quantity.aspect ? ` · ${aspectLabel(t, quantity.aspect)}` : ''}
       {quantity.measuredAt ? ` · ${t('card.measured', { name: quantity.measuredAt })}` : ''}
       {quantity.periodStart || quantity.periodEnd ? ` · ${t('card.period', { name: period })}` : ''}
@@ -665,7 +618,7 @@ function draftQuantityLabel(t: ReturnType<typeof useI18n>['t'], language: 'en' |
   if (property) {
     return language === 'ru' ? property.name.ru : property.name.en
   }
-  return quantity.quantityKind ? quantityLabel(t, quantity.quantityKind) : t('card.reviewQuantity')
+  return quantity.quantityKind ? quantityLabel(t, quantity.quantityKind) : t('card.characteristic')
 }
 
 function storedQuantityLabel(t: ReturnType<typeof useI18n>['t'], language: 'en' | 'ru', library: QuantityLibrary, quantity: MeasuredQuantity): string {

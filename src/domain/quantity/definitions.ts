@@ -59,13 +59,14 @@ export type QuantityLibrary = {
 export const suggestedPropertyCategories = [
   'physical',
   'chemical',
-  'biological',
-  'radiological',
+  'quality',
   'mechanical',
   'energy',
+  'quantitative',
   'technological',
   'environmental',
-  'quantitative',
+  'biological',
+  'radiological',
 ] as const
 
 export function emptyQuantityLibrary(): QuantityLibrary {

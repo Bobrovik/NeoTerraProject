@@ -58,6 +58,14 @@
 
 .extra summary { cursor: pointer; color: var(--muted); }
 
+.results { display: flex; flex-direction: column; gap: 8px; }
+
+.result { text-align: left; }
+
+.summary { display: flex; flex-direction: column; gap: 4px; margin: 0; }
+
+.relevant { border-radius: 8px; outline: 1px solid var(--accent); padding: 8px; }
+
 @media (max-width: 720px) {
   .grid { grid-template-columns: 1fr; }
 }
