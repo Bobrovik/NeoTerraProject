@@ -76,6 +76,8 @@ Missing values stay absent. Do not store a missing number as zero.
 
 - City viewer and editor, object placement, roads, schematic 3D, energy balance (`calculateEnergyBalance`), and a single-city project file.
 - Planet layers: flags, armed conflicts, forest resources, freshwater, mineral deposits, population. Extra layers default off.
+- The planet header carries a small rotating logo loaded from `public/models/logo.glb`, and the planet view has a play/pause control for the files listed in `src/features/planet/planet-playlist.ts`. Those files live in `public/audio/`. Music starts only after the control is used. The planet route uses a scoped terminal palette. Other pages keep the shared shell.
+- The planet globe uses equirectangular satellite imagery from `public/textures/earth/` on the same latitude and longitude mapping as the country borders. A separate cloud shell can be turned off from the legend. Borders, names, and markers stay on the vector overlay.
 - Forest and population color countries from national World Bank statistics. They are not forest-stand maps or counts of people inside a shape.
 - Conflicts are UCDP candidate points through the Vite `/ucdp-feed` forward. Country-only precision is not drawn.
 - Minerals are USGS major nonfuel deposits (OFR 2005-1294). Shape and color mark the category. Oil, natural gas, reserves, and mine status are not in that file.
@@ -102,6 +104,8 @@ The working tree may contain edits outside a catalog commit. Do not fold unrelat
 - Do not invent scientific numbers. A demo value must be labeled demo. A link is not verification. Do not invent a property for a legacy `quantityKind`, and do not invent a `quantityKind` for a quantity that is not one of the explicit mappings.
 - Changing a compatible unit converts the entered number through the dimension model. An incompatible unit is not offered. User definitions are validated for dimension, id, factor, and unit compatibility before they are stored. Selecting a library quantity fills its dimension and compatible units.
 - Do not rewrite `calculateEnergyBalance`, the editor/viewer split, or city import unless the task requires it.
+- The planet logo and the planet music control stay outside the globe canvas. Adding or removing a track is a change to `planetPlaylist` only.
+- Earth imagery stays in `public/textures/earth/`. The surface, the atmosphere, and the clouds are visual shells. They do not change coordinates, borders, or planet-layer data. Clouds are not a data layer.
 - Node on PATH may be 18. Use portable Node 22 at `%LOCALAPPDATA%\node-v22.23.3-win-x64` for tests, `tsc`, and ESLint. PowerShell does not accept `&&`.
 
 ## Known Issues

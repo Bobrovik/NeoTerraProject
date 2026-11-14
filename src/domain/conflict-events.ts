@@ -22,10 +22,10 @@ export type ConflictFeed = {
 }
 
 export const conflictPrecisionColor: Record<ConflictPrecision, string> = {
-  exact: '#ff4b4b',
+  exact: '#e32636',
   nearby: '#f0a202',
   'area-point': '#b388ff',
-  international: '#4cc3ff',
+  international: '#42c8f5',
 }
 
 const violenceLabels: Record<string, string> = {
