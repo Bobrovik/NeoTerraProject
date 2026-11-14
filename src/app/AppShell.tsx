@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router'
 import { useCatalogState } from '../data/useCatalog'
 import { useI18n } from '../shared/i18n/useI18n'
@@ -9,10 +9,13 @@ import { ErrorState, LoadingState } from '../shared/ui/Status'
 import { appConfig } from './config'
 import styles from './AppShell.module.css'
 
+const PlanetLogo = lazy(() => import('../features/planet/PlanetLogo').then((module) => ({ default: module.PlanetLogo })))
+
 export function AppShell() {
   const catalog = useCatalogState()
   const { t } = useI18n()
   const location = useLocation()
+  const planet = location.pathname === '/planet' || location.pathname.startsWith('/planet/')
   const links = [
     { to: '/', label: 'Home', end: true },
     { to: '/planet', label: 'Planet', end: false },
@@ -30,7 +33,21 @@ export function AppShell() {
   return (
     <div className={styles.shell}>
       <header className={styles.header}>
-        <Link className={styles.brand} to="/">{appConfig.name}</Link>
+        {planet ? (
+          <div className={styles.identity}>
+            <span className={styles.mark} aria-hidden="true">
+              <Suspense fallback={null}>
+                <PlanetLogo placement="brand" />
+              </Suspense>
+            </span>
+            <span className={styles.identityText}>
+              <Link className={styles.brand} to="/">{appConfig.name}</Link>
+              <span className={styles.suite}>Monitoring suite</span>
+            </span>
+          </div>
+        ) : (
+          <Link className={styles.brand} to="/">{appConfig.name}</Link>
+        )}
         <nav className={styles.nav} aria-label="Primary">
           {links.map((link) => (
             <NavLink key={link.to} to={link.to} end={link.end}>

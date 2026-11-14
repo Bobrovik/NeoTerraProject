@@ -31,6 +31,8 @@ export function GlobeLegend({
   forest,
   minerals,
   onToggleMineral,
+  showClouds,
+  onToggleClouds,
 }: {
   layers: PlanetLayers
   onToggle: (id: PlanetLayerId) => void
@@ -38,6 +40,8 @@ export function GlobeLegend({
   forest: { active: boolean; low: string; high: string; lowColor: string; highColor: string; yearLabel: string; missingColor: string }
   minerals: Array<MineralCategory & { selected: boolean }>
   onToggleMineral: (id: string) => void
+  showClouds?: boolean
+  onToggleClouds?: () => void
 }) {
   const [conflictsOpen, setConflictsOpen] = useState(false)
   const [mineralsOpen, setMineralsOpen] = useState(false)
@@ -80,6 +84,11 @@ export function GlobeLegend({
           <span className={styles.flagMark} />
           Country flags
         </LegendToggle>
+        {onToggleClouds ? (
+          <LegendToggle pressed={showClouds === true} onClick={onToggleClouds}>
+            Clouds
+          </LegendToggle>
+        ) : null}
       </div>
       {layers.conflicts && conflictsOpen ? (
         <ul className={styles.legendPanel}>
@@ -329,7 +338,7 @@ export function ConflictLegend({ events, omittedCountryOnly }: { events: Conflic
 
 export function ConflictCard({ event }: { event: ConflictEvent }) {
   return (
-    <article className={styles.card}>
+    <article className={`${styles.card} ${styles.alert}`}>
       <h2>{event.name}</h2>
       <p>{event.violence}. {event.country}{event.region ? `, ${event.region}` : ''}.</p>
       <p className={controls.muted}>{precisionLabels[event.precision]}</p>
@@ -377,7 +386,7 @@ export function ShadeScale({ lowColor, highColor, low, high, missingColor }: { l
 export function MineralCard({ deposit }: { deposit: MineralDeposit }) {
   const rareEarth = deposit.categories.includes('rare-earth')
   return (
-    <article className={styles.card}>
+    <article className={`${styles.card} ${styles.brief}`}>
       <h2>{deposit.name}</h2>
       <p>{deposit.commodity || 'Commodity not named'}{deposit.country ? `. ${deposit.country}` : ''}.</p>
       <p className={controls.muted}>Geologic setting: {deposit.geologicSetting || 'not recorded'}.</p>

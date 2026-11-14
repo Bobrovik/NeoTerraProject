@@ -1,19 +1,21 @@
 import { Html, OrbitControls } from '@react-three/drei'
-import { Canvas, useFrame } from '@react-three/fiber'
-import { useLayoutEffect, useMemo, useRef } from 'react'
+import { Canvas, useFrame, useThree } from '@react-three/fiber'
+import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { BufferAttribute, BufferGeometry, Camera, Color, DoubleSide, InstancedMesh, Mesh, MeshBasicMaterial, MeshStandardMaterial, Object3D, PerspectiveCamera, Quaternion, SRGBColorSpace, Vector3 } from 'three'
 import { latLonToVector3 } from '../domain/geo'
 import type { CountryShade } from '../domain/country-shade'
 import { symbolTriangles, type MineralSymbol } from '../domain/mineral-symbols'
 import type { City, Vec3 } from '../domain/types'
 import { coasts, countries, countryShadeAttributes, fanFromRing, lineSegmentsFromRings, ribbonFromRings, type MapCountry, type MapRing } from './borders'
+import { approachCameraPosition, globeApproachSeconds, globeCloseDistance } from './globe-approach'
 import { oceans } from './globe-marks'
+import { EarthBoundary, PlainOcean, SatelliteEarth } from './EarthSurface'
 import { StarField } from './StarField'
 
 const RADIUS = 1
 
 const countryLines = lineSegmentsFromRings(countries.flatMap((country) => country.rings), RADIUS * 1.012)
-const continentEdges = ribbonFromRings(coasts, RADIUS * 1.02, 0.008)
+const continentEdges = ribbonFromRings(coasts, RADIUS * 1.01, 0.003)
 
 export function GlobeView({
   cities,
@@ -33,6 +35,9 @@ export function GlobeView({
   forestOpacity = 0.82,
   onSelectConflict,
   onSelectDeposit,
+  approachCityId = null,
+  onApproachComplete,
+  showClouds = true,
 }: {
   cities: City[]
   selectedId: string | null
@@ -51,17 +56,54 @@ export function GlobeView({
   forestOpacity?: number
   onSelectConflict?: (id: string) => void
   onSelectDeposit?: (id: string) => void
+  approachCityId?: string | null
+  onApproachComplete?: () => void
+  showClouds?: boolean
 }) {
+  const [autoRotate, setAutoRotate] = useState(false)
+  const inactivityTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const approachingRef = useRef(false)
+  approachingRef.current = approachCityId !== null
+  const approachCity = cities.find((city) => city.id === approachCityId) ?? null
+  const startInactivityTimer = useCallback(() => {
+    if (inactivityTimer.current !== null) {
+      clearTimeout(inactivityTimer.current)
+    }
+    inactivityTimer.current = setTimeout(() => {
+      if (!approachingRef.current) {
+        setAutoRotate(true)
+      }
+    }, 5000)
+  }, [])
+  const stopAutoRotate = useCallback(() => {
+    if (inactivityTimer.current !== null) {
+      clearTimeout(inactivityTimer.current)
+      inactivityTimer.current = null
+    }
+    setAutoRotate(false)
+  }, [])
+
+  useEffect(() => {
+    startInactivityTimer()
+    return () => stopAutoRotate()
+  }, [startInactivityTimer, stopAutoRotate])
+
+  useEffect(() => {
+    if (approachCityId) {
+      stopAutoRotate()
+    }
+  }, [approachCityId, stopAutoRotate])
   return (
     <Canvas camera={{ position: [0, 0.4, 3.1], fov: 45 }} dpr={[1, 1.5]}>
       <color attach="background" args={['#05070d']} />
       <StarField count={1600} radius={8} size={0.045} />
       <ambientLight intensity={0.7} />
       <directionalLight position={[4, 2, 3]} intensity={1.2} />
-      <mesh>
-        <sphereGeometry args={[RADIUS, 64, 48]} />
-        <meshStandardMaterial color="#0d4a66" roughness={0.9} metalness={0.04} />
-      </mesh>
+      <Suspense fallback={<PlainOcean />}>
+        <EarthBoundary>
+          <SatelliteEarth showClouds={showClouds} />
+        </EarthBoundary>
+      </Suspense>
       <LineSegments positions={countryLines} color="#7f97a8" renderOrder={8} />
       <Ribbon positions={continentEdges} color="#f4f7fb" />
       {populationShades.length > 0 ? <CountryShadeLayer shades={populationShades} radius={RADIUS * 1.005} opacity={populationOpacity} renderOrder={2} /> : null}
@@ -78,9 +120,39 @@ export function GlobeView({
       {cities.map((city) => (
         <CityBeacon key={city.id} city={city} selected={city.id === selectedId} onSelect={onSelect} />
       ))}
-      <OrbitControls enablePan={false} minDistance={1.45} maxDistance={6} autoRotate autoRotateSpeed={0.35} />
+      <OrbitControls enablePan={false} enabled={approachCity === null} minDistance={globeCloseDistance} maxDistance={6} autoRotate={autoRotate && approachCity === null} autoRotateSpeed={0.35} onStart={stopAutoRotate} onEnd={startInactivityTimer} />
+      {approachCity && onApproachComplete ? <CityApproach city={approachCity} onComplete={onApproachComplete} /> : null}
     </Canvas>
   )
+}
+
+function CityApproach({ city, onComplete }: { city: City; onComplete: () => void }) {
+  const camera = useThree((state) => state.camera)
+  const start = useRef<Vec3 | null>(null)
+  const elapsed = useRef(0)
+  const finished = useRef(false)
+  const onCompleteRef = useRef(onComplete)
+  onCompleteRef.current = onComplete
+
+  useFrame((_, delta) => {
+    if (finished.current) {
+      return
+    }
+    if (!start.current) {
+      start.current = { x: camera.position.x, y: camera.position.y, z: camera.position.z }
+    }
+    elapsed.current += delta
+    const progress = Math.min(1, elapsed.current / globeApproachSeconds)
+    const pose = approachCameraPosition(start.current, latLonToVector3(city.latitude, city.longitude, 1), globeCloseDistance, progress)
+    camera.position.set(pose.x, pose.y, pose.z)
+    camera.lookAt(0, 0, 0)
+    if (progress >= 1) {
+      finished.current = true
+      onCompleteRef.current()
+    }
+  })
+
+  return null
 }
 
 function LineSegments({ positions, color, renderOrder = 0 }: { positions: Float32Array; color: string; renderOrder?: number }) {
@@ -142,10 +214,10 @@ function WaterLayer({ rivers, lakes }: { rivers: MapRing[]; lakes: MapRing[] }) 
   }
   return (
     <>
-      <mesh geometry={lakeGeometry} raycast={() => null}>
+      <mesh geometry={lakeGeometry} renderOrder={4} raycast={() => null}>
         <meshBasicMaterial color="#1c7c9c" transparent opacity={0.45} depthWrite={false} side={DoubleSide} />
       </mesh>
-      <lineSegments geometry={riverGeometry} raycast={() => null}>
+      <lineSegments geometry={riverGeometry} renderOrder={5} raycast={() => null}>
         <lineBasicMaterial color="#9fd0e4" />
       </lineSegments>
     </>

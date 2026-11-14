@@ -1,0 +1,40 @@
+.music {
+  position: absolute;
+  z-index: 4;
+  left: 50%;
+  bottom: 14px;
+  transform: translateX(-50%);
+}
+
+.music button {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid rgba(227, 38, 54, 0.7);
+  border-radius: 2px;
+  background: rgba(8, 13, 18, 0.92);
+  color: #e32636;
+}
+
+.music button:hover:not(:disabled) { border-color: var(--accent); }
+
+.music button:disabled { opacity: 0.45; }
+
+.music[data-playing='true'] button {
+  box-shadow: 0 0 0 1px rgba(227, 38, 54, 0.55);
+}
+
+.music svg { width: 10px; height: 10px; fill: currentColor; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .music[data-playing='true'] button {
+    animation: planetMusicGlow 2.4s ease-in-out infinite;
+  }
+}
+
+@keyframes planetMusicGlow {
+  0%, 100% { box-shadow: 0 0 0 1px rgba(227, 38, 54, 0.28); }
+  50% { box-shadow: 0 0 0 1px rgba(227, 38, 54, 0.75); }
+}

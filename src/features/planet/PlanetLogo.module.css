@@ -1,0 +1,22 @@
+.logo {
+  position: absolute;
+  z-index: 3;
+  top: 8px;
+  left: 8px;
+  width: 64px;
+  height: 64px;
+  pointer-events: none;
+}
+
+.logo canvas,
+.brand canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.brand {
+  width: 28px;
+  height: 28px;
+  pointer-events: none;
+}

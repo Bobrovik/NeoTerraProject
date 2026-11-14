@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { useReadyCatalog } from '../../data/useCatalog'
+import { globeApproachSeconds } from '../../3d/globe-approach'
 import { GlobeView } from '../../3d/GlobeView'
 import { countries } from '../../3d/borders'
 import { SceneBoundary } from '../../3d/SceneBoundary'
@@ -13,6 +14,7 @@ import { ReliabilityBadge } from '../../shared/ui/ReliabilityBadge'
 import controls from '../../shared/ui/controls.module.css'
 import { ImportCityButton } from '../city/CityFileActions'
 import { ConflictCard, ConflictLegend, CountryFacts, GlobeLegend, LayerStatus, MineralCard, MineralFilters, PlanetLayerToggles, ShadeScale } from './PlanetLayers'
+import { PlanetMusic } from './PlanetMusic'
 import styles from './PlanetPage.module.css'
 import { usePlanetFeeds, type RemoteFeed } from './usePlanetFeeds'
 
@@ -39,8 +41,11 @@ export function PlanetPage() {
   const { snapshot } = useReadyCatalog()
   const navigate = useNavigate()
   const [selectedId, setSelectedId] = useState<string | null>(snapshot.cities[0]?.id ?? null)
+  const [openingCityId, setOpeningCityId] = useState<string | null>(null)
+  const openingCityRef = useRef<string | null>(null)
   const [formMessage, setFormMessage] = useState<string | undefined>()
   const [layers, setLayers] = useState(defaultPlanetLayers)
+  const [showClouds, setShowClouds] = useState(true)
   const [countryName, setCountryName] = useState<string | null>(null)
   const [conflictId, setConflictId] = useState<string | null>(null)
   const [depositId, setDepositId] = useState<string | null>(null)
@@ -84,15 +89,46 @@ export function PlanetPage() {
   )
   const bothShaded = populationShade.shades.length > 0 && forestShade.shades.length > 0
 
+  const finishApproach = useCallback(() => {
+    const cityId = openingCityRef.current
+    if (cityId) {
+      navigate(`/cities/${cityId}`)
+    }
+  }, [navigate])
+
   useEffect(() => {
     return () => {
       document.body.style.cursor = ''
     }
   }, [])
 
+  useEffect(() => {
+    if (!openingCityId) {
+      return
+    }
+    const timer = window.setTimeout(finishApproach, (globeApproachSeconds + 0.6) * 1000)
+    return () => window.clearTimeout(timer)
+  }, [openingCityId, finishApproach])
+
+  function openSelectedCity(event: MouseEvent<HTMLAnchorElement>) {
+    if (!selected || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+      return
+    }
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      return
+    }
+    event.preventDefault()
+    if (openingCityRef.current) {
+      return
+    }
+    openingCityRef.current = selected.id
+    setOpeningCityId(selected.id)
+  }
+
   return (
-    <div className={styles.layout}>
+    <div className={styles.layout} data-planet-terminal="">
       <div className={styles.viewport}>
+        <div className={styles.legendSlot}>
         <GlobeLegend
           layers={layers}
           onToggle={(id: PlanetLayerId) => setLayers((current) => togglePlanetLayer(current, id))}
@@ -117,7 +153,18 @@ export function PlanetPage() {
           }}
           minerals={mineralCategoryLabels.filter((category) => mineralCategories.includes(category.id)).map((category) => ({ ...category, selected: activeMinerals.has(category.id) }))}
           onToggleMineral={(id) => setMineralSelection((current) => toggleCategory(current ?? mineralCategories, id))}
+          showClouds={showClouds}
+          onToggleClouds={() => setShowClouds((current) => !current)}
         />
+        </div>
+        <div className={styles.stage}>
+        <div className={styles.marks} aria-hidden="true">
+          <span>60° N</span>
+          <span>90° W</span>
+          <span>90° E</span>
+          <span>60° S</span>
+        </div>
+        <PlanetMusic />
         <SceneBoundary>
           <GlobeView
             cities={snapshot.cities}
@@ -137,8 +184,12 @@ export function PlanetPage() {
             forestOpacity={bothShaded ? 0.5 : 0.84}
             onSelectConflict={setConflictId}
             onSelectDeposit={setDepositId}
+            showClouds={showClouds}
+            approachCityId={openingCityId}
+            onApproachComplete={finishApproach}
           />
         </SceneBoundary>
+        </div>
       </div>
       <aside className={styles.side}>
         <p className={controls.muted}>Drag to rotate the globe. Scroll to zoom. Gold beacons are cities. Click a country name for its population. Extra layers stay off until checked.</p>
@@ -199,24 +250,24 @@ export function PlanetPage() {
           ))}
         </ul>
         {selected ? (
-          <article className={styles.card}>
+          <article className={`${styles.card} ${styles.dossier}`}>
             <div className={controls.row}>
               <h2>{selected.name}</h2>
               <ReliabilityBadge reliability={selected.reliability} />
             </div>
             <p>{selected.description}</p>
-            <p className={controls.muted}>
+            <p className={`${controls.muted} ${styles.meta}`}>
               {developmentStatusLabel[selected.developmentStatus]} · {selected.latitude.toFixed(1)}°, {selected.longitude.toFixed(1)}°
             </p>
-            <div className={controls.row}>
-              <Link className={controls.button} to={`/cities/${selected.id}`}>Open city</Link>
+            <div className={`${controls.row} ${styles.actions}`}>
+              <Link className={controls.button} to={`/cities/${selected.id}`} aria-disabled={openingCityId !== null} onClick={openSelectedCity}>Open city</Link>
               <Link className={controls.ghost} to={`/editor/${selected.id}`}>Open in editor</Link>
             </div>
           </article>
         ) : (
           <p className={controls.muted}>No cities are in the catalog.</p>
         )}
-        <div className={controls.row}>
+        <div className={`${controls.row} ${styles.actions}`}>
           <Link className={controls.button} to="/editor">Design a city</Link>
           <ImportCityButton
             onImported={(result) => {
